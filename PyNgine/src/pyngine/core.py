@@ -176,6 +176,10 @@ class GameObject(object):
         self.__updatecomponents('remove', component)
         component.gameobject = None
         component.transform = None
+    def getcomponentbyclass(self, cls):
+        for component in self.components:
+            if isinstance(component, cls):
+                return component
     def __updatecomponents(self, action, component):
         getattr(self.components, action)(component)
         if isinstance(component, Renderer):
@@ -197,14 +201,8 @@ class GameObject(object):
 
 
 class Collider(Component):
-    def __init__(self, fillcolor, strokecolor, strokewidth, alpha, zoom):
-        self.fillcolor = fillcolor
-        self.strokecolor = strokecolor
-        self.strokewidth = strokewidth
-        self.alpha = alpha
-        self.zoom = zoom
-    def render(self, x, y, angle, zoom):
-        pass
+    def __init__(self):
+        Component.__init__(self)
 
 
 class Light(Component):
@@ -237,16 +235,15 @@ class Light(Component):
 
 
 class Game(object):
-    def __init__(self, screen_size=(800, 600)):
+    def __init__(self, screen_size=(800, 600), title="PyNgine Game"):
         self.screen_size = screen_size
         self.camera = None
         self.lights = []
         self.gameobjects = []
-        self.init()
-    def init(self):
+
         pygame.init()
         screen_size = self.screen_size
-        # pygame.display.set_caption(titulo)
+        pygame.display.set_caption(title)
         # pygame.display.set_icon(icono)
         params = OPENGL | DOUBLEBUF
         # params |= FULLSCREEN
@@ -254,7 +251,6 @@ class Game(object):
         # params |= NOFRAME
         pygame.display.set_mode(screen_size, params)
         
-        ### start GL stuff
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_COLOR_MATERIAL)
         glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
@@ -282,7 +278,6 @@ class Game(object):
         glFrontFace(GL_CCW)
         glCullFace(GL_BACK)
         glEnable(GL_CULL_FACE)
-        ### end GL stuff
         
     def addgameobject(self, gameobject):
         self.gameobjects.append(gameobject)
@@ -303,9 +298,6 @@ class Game(object):
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glEnable(GL_DEPTH_TEST)
-
-        for gameobject in self.gameobjects:
-            gameobject.update()
 
         self.clear_screen()
         if self.camera: self.camera.push()
@@ -333,6 +325,8 @@ class Game(object):
     def __mainloop(self):
         while not Input.quitflag:
             Input.update()
+            for gameobject in self.gameobjects:
+                gameobject.update()
             self.renderloop()
 
 
