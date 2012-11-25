@@ -31,12 +31,14 @@ class Collider(Component):
         Component.__init__(self)
         self.body = ode.Body(world)
     def start(self):
-        self.body.setPosition(self.gameobject.transform.position)
+        self.setposition(self.gameobject.transform.position)
     def update(self):
         self.gameobject.transform.position = self.body.getPosition()
         self.gameobject.transform.rotation = self.body.getQuaternion()[:3]
     def addforce(self, force):
         self.body.addForce(force)
+    def setposition(self, position):
+        self.body.setPosition(position)
     def oncollision(self):
         pass
 
@@ -242,6 +244,10 @@ class GameObject(object):
         
     def getcomponentsbyclass(self, cls):
         return filter(lambda c: isinstance(c, cls), self.components)
+    
+    def setposition(self, newposition):
+        self.transform.position = newposition
+        self.rigidbody.setposition(newposition)
             
     def __checktransformcomponent(self, component):
         if isinstance(component, Transform):
