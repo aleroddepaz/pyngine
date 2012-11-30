@@ -1,10 +1,11 @@
+import os
 import ode
+import math
 import pygame
 import pygame.locals as pgl
 from itertools import imap
 from OpenGL.GL import *  # @UnusedWildImport
 from OpenGL.GLU import *  # @UnusedWildImport
-from OpenGL.GLUT import *  # @UnusedWildImport
 
 
 
@@ -25,25 +26,37 @@ class Component(object):
 
 
 class Renderer(Component):
+    def __init__(self, color):
+        Component.__init__(self)
+        self.gl_list = glGenLists(1)
+        self.color = color
+    def render(self):
+        x, y, z = self.transform.getposition()
+        a, b, c = self.transform.getrotation()
+        glPushMatrix()
+        glTranslatef(x, y, -z)
+        glRotatef(a, 1, 0, 0)
+        glRotatef(b, 0, 1, 0)
+        glRotatef(c, 0, 0, 1)
+        if self.transform.scale != (1, 1, 1):
+            glScalef(*self.transform.getscale())
+        glColor(*self.color)
+        glCallList(self.gl_list)
+        glPopMatrix()
+    def calculatenormal(self, p1, p2, p3):
+        v1 = (p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2])
+        v2 = (p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2])
+        vx = (v1[1] * v2[2]) - (v1[2] * v2[1])
+        vy = (v1[2] * v2[0]) - (v1[0] * v2[2])
+        vz = (v1[0] * v2[1]) - (v1[1] * v2[0])
+        return (vx, vy, vz)
+
+
+class Rigidbody(Component):
     def __init__(self):
         Component.__init__(self)
-    def render(self):
-        pass
-
-
-class Collider(Component):
-    def __init__(self, world):
-        Component.__init__(self)
-        self.body = ode.Body(world)
-    def start(self):
-        self.setposition(self.gameobject.transform.position)
-    def update(self):
-        self.gameobject.transform.position = self.body.getPosition()
-        self.gameobject.transform.rotation = self.body.getQuaternion()[:3]
     def addforce(self, force):
         self.body.addForce(force)
-    def setposition(self, position):
-        self.body.setPosition(position)
     def oncollision(self):
         pass
 
@@ -51,25 +64,32 @@ class Collider(Component):
 class Transform(Component):
     def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
         Component.__init__(self)
-        self.position = position
-        self.rotation = rotation
+        self.body = ode.Body(GameObject._world)
+        self.setPosition(position)
+        self.setRotation(rotation)
         self.scale = scale
         self.right = (1, 0, 0)
         self.up = (0, 1, 0)
         self.forward = (0, 0, 1)
+    def getposition(self):
+        return self.body.getPosition()
+    def getrotation(self):
+        return self.body.getRotation()
+    def getscale(self):
+        return self.scale
     def move(self, position):
-        self.position = map(sum, zip(self.position, position))
+        self.body.setPosition(map(sum, zip(self.position, position)))
     def rotate(self, rotation):
-        self.rotation = map(sum, zip(self.rotation, rotation))
+        self.body.setRotation(map(sum, zip(self.rotation, rotation)))
     def rotatearound(self, other):
         pass  # TO DO
     def lookat(self, other):
         pass  # TO DO
 
 
-class Camera(Renderer):
+class Camera(Component):
     def __init__(self, distance=(0, 0, 0)):
-        Renderer.__init__(self)
+        Component.__init__(self)
         self.distance = distance
     def push(self):
         dx, dy, dz = self.distance
@@ -96,7 +116,7 @@ class Camera(Renderer):
 
 
 class Light(Component):
-    gl_lights = range(GL_LIGHT0, GL_LIGHT7 + 1) # Max 8 lights
+    _gllights = range(GL_LIGHT0, GL_LIGHT7 + 1) # Max 8 lights
     def __init__(self, ambient=(0, 0, 0, 1), diffuse=(1, 1, 1, 1),
                  specular=(1, 1, 1, 1), spot_direction=(0, 0, 1)):
         Component.__init__(self)
@@ -120,14 +140,48 @@ class Light(Component):
             glDisable(self.gl_light)
     @classmethod
     def __getnextlight(cls):
-        try: return cls.gl_lights.pop()
+        try: return cls._gllights.pop()
         except IndexError: return None
 
 
+class Sphere(Renderer):
+    def __init__(self, color=(0, 0, 0, 1)):
+        Renderer.__init__(self, color)
+        glNewList(self.gl_list, GL_COMPILE)
+        
+        verts = []
+        texcs = []
+        norms = []
+        space = 15 #self.detail
+        for meridian in xrange(0, 180, space):
+            for parallels in xrange(0, 360, space):
+                _v = []
+                _t = []
+                for i in xrange(2):
+                    for j in xrange(2):
+                        phi = (parallels + space*i) / 180.
+                        theta = (meridian + space*j) / 180.
+                        x = math.sin(phi*math.pi) * math.sin(theta*math.pi) * 0.5
+                        z = math.cos(phi*math.pi) * math.sin(theta*math.pi) * 0.5
+                        y = math.cos(theta*math.pi) * 0.5
+                        _v.append((x,y,z))
+                        _t.append((phi/2, 1 - theta))
+                verts.extend([_v[0], _v[1], _v[3], _v[0], _v[3], _v[2]])
+                texcs.extend([_t[0], _t[1], _t[3], _t[0], _t[3], _t[2]])
+                norms.extend([self.calculatenormal(*verts[-6:-3])]*3)
+                norms.extend([self.calculatenormal(*verts[-3::])]*3)
+        glBegin(GL_TRIANGLES)
+        for i, vert in enumerate(verts):
+            u,v = texcs[i]
+            glTexCoord2f(u,v)
+            glNormal3f(*norms[i])
+            glVertex3f(*vert)
+        glEnd()
+        glEndList()
+
 class Cube(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
-        Renderer.__init__(self)
-        self.color = color
+        Renderer.__init__(self, color)
         self.corners = [(-0.5, -0.5, 0.5),
                       (0.5, -0.5, 0.5),  # toprightfront
                       (0.5, 0.5, 0.5),  # bottomrightfront
@@ -155,7 +209,6 @@ class Cube(Renderer):
                              (3, 1),  # right
                              (2, 0))  # bottom
         coords = ((1,1), (1,0), (0,0), (0,1))
-        self.gl_list = glGenLists(1)
         glNewList(self.gl_list, GL_COMPILE)
         for i in self.sides:
             ix = 0
@@ -170,30 +223,15 @@ class Cube(Renderer):
             glEnd()
         glEndList()
 
-    def render(self):
-        x, y, z = self.transform.position
-        a, b, c = self.transform.rotation
-        glPushMatrix()
-        glTranslatef(x, y, -z)
-        glRotatef(a, 1, 0, 0)
-        glRotatef(b, 0, 1, 0)
-        glRotatef(c, 0, 0, 1)
-        try:
-            if self.transform.scale != (1, 1, 1):
-                glScalef(*self.transform.scale)
-        except: pass
-        glColor(*self.color)
-        glCallList(self.gl_list)
-        glPopMatrix()
 
-
-class CubeCollider(Collider):
-    def __init__(self, world, size=(1, 1, 1), density=1):
-        Collider.__init__(self, world)
+class CubeCollider(Rigidbody):
+    def __init__(self, size=(1, 1, 1), density=1):
+        Rigidbody.__init__(self)
         self.size = size
         mass = ode.Mass()
         mass.setBox(density, *size)
         self.body.setMass(mass)
+
 
 
 # ==============================
@@ -201,53 +239,63 @@ class CubeCollider(Collider):
 # ==============================
 
 class GameObject(object):
+    _camera = None
+    _lights = []
+    _world = ode.World()
     def __init__(self, transform=Transform(), *components):
+        self.parent = None
+        self.children = []
+        self.name = ''
+        self.tag = ''
+        
         self.transform = transform
         self.rigidbody = None
         self.components = []
         self.renderables = []
-        self.scene = None
-        self.tag = ''
         for c in components:
             if c != None: self.addcomponent(c)
-        
+
     def addcomponent(self, component):
-        self.__updatecomponents('append', component)
-        self.__checktransformcomponent(component)
-        self.__checkrigidbodycomponent(component)
+        if isinstance(component, Camera):
+            GameObject._camera = component
+        
+        self._updatecomponents('append', component)
+        self._checkcomponent('transform', component)
+        self._checkcomponent('rigidbody', component)
         component.gameobject = self
         component.transform = self.transform
         component.start()
         
     def removecomponent(self, component):
-        self.__updatecomponents('remove', component)
+        if component == None:
+            return
+        if isinstance(component, Camera):
+            GameObject._camera = None
+        
+        self._updatecomponents('remove', component)
         component.gameobject = None
         component.transform = None
         
-    def getcomponentsbyclass(self, cls):
-        return filter(lambda c: isinstance(c, cls), self.components)
+    def getcomponentbyclass(self, cls):
+        for c in self.components:
+            if isinstance(c, cls):
+                return c
     
     def setposition(self, newposition):
         self.transform.position = newposition
         self.rigidbody.setposition(newposition)
             
-    def __checktransformcomponent(self, component):
-        if isinstance(component, Transform):
-            oldtransform = self.transform
-            self.transform = component
+    def _checkcomponent(self, clsstring, component): # Use with caution!
+        if isinstance(component, eval(clsstring.capitalize())):
+            oldcomponent = self.__dict__[clsstring]
+            self.__dict__[clsstring] = component
             for c in self.components:
-                c.transform = component
-            self.removecomponent(oldtransform)
+                c.__dict__[clsstring] = component
+            self.removecomponent(oldcomponent)
             
-    def __checkrigidbodycomponent(self, component):
-        if isinstance(component, Collider):
-            if self.rigidbody != None:
-                oldrigidbody = self.rigidbody
-                self.rigidbody = component
-                self.removecomponent(oldrigidbody)
-            else: self.rigidbody = component
-            
-    def __updatecomponents(self, action, component):
+    def _updatecomponents(self, action, component):
+        if isinstance(component, Light):
+            getattr(GameObject._lights, action)(component)
         if isinstance(component, Component):
             getattr(self.components, action)(component)
         if isinstance(component, Renderer):
@@ -259,61 +307,118 @@ class GameObject(object):
             if result != None: return result
     def update(self):
         for component in self.components: component.update()
+        for gameobject in self.children: gameobject.update()
     def render(self):
         for component in self.renderables: component.render()
+        for gameobject in self.children: gameobject.render()
     def destroy(self):
-        self.scene.removegameobject(self)
-
+        self.parent.removegameobject(self)
+    
+    def addgameobject(self, gameobject):
+        self._addgameobject(gameobject)
+    def addgameobjects(self, *gameobjects):
+        for gameobject in gameobjects:
+            self._addgameobject(gameobject)
+    def _addgameobject(self, gameobject):
+        self.children.append(gameobject)
+        gameobject.parent = self
+    def removegameobject(self, gameobject):
+        self.gameobjects.remove(gameobject)
+        gameobject.parent = None
 
 class CubePrimitive(GameObject):
-    def __init__(self, transform, color, world, density=1):
+    def __init__(self, transform, color, density=1):
         GameObject.__init__(self, transform)
         self.addcomponent(Cube(color))
-        self.addcomponent(CubeCollider(world, transform.scale, density))
+        self.addcomponent(CubeCollider(transform.scale, density))
+
+
+class SpherePrimitive(GameObject):
+    def __init__(self, transform, color, density=1):
+        GameObject.__init__(self, transform)
+        self.addcomponent(Sphere(color))
+        self.addcomponent(CubeCollider(transform.scale, density))
+
+
+
+# ==============================
+# Color
+# ==============================
+
+class MetaColor(type):
+    @property
+    def red(cls): return cls(1, 0, 0, 1)  # @NoSelf
+    @property
+    def green(cls): return cls(0, 1, 0, 1)  # @NoSelf
+    @property
+    def blue(cls): return cls(0, 0, 1, 1)  # @NoSelf
+    @property
+    def yellow(cls): return cls(1, 1, 0, 1)  # @NoSelf
+    @property
+    def magenta(cls): return cls(1, 0, 1, 1)  # @NoSelf
+    @property
+    def cyan(cls): return cls(0, 1, 1, 1)  # @NoSelf
+    @property
+    def black(cls): return cls(0, 0, 0, 1)  # @NoSelf
+    @property
+    def white(cls): return cls(1, 1, 1, 1)  # @NoSelf
+    @property
+    def gray(cls): return cls(.5, .5, .5, 1)  # @NoSelf
+
+
+class Color(object):
+    __metaclass__ = MetaColor
+    def __init__(self, r=0, g=0, b=0, a=1):
+        self.__color = (r, g, b, a)
+    def __getitem__(self, index):
+        return self.__color[index]
+    def __repr__(self):
+        return self.__color
+
 
 
 # ==============================
 # Game
 # ==============================
 
-class Game(object):
-    def __init__(self, screensize=(800, 600), title="Pyngine game"):
-        self.screensize = screensize
-        self.title = title
-        self.camera = None
-        self.lights = []
-        self.gameobjects = []
-        self.world = ode.World()
-
+class RenderCore(object):
+    """
+    Class implemented using the Facade pattern for
+    abstracting the use of Pygame and OpenGL functions
+    """
+    _screenwidth = None
+    _screenheight = None
+    _aspect = 0
+    _viewangle = 45
+    _closeview = 0.1
+    _farview = 100.0
+    @classmethod
+    def init(cls, screensize, hwsurface):
+        cls._screenwidth = screensize[0]
+        cls._screenheight = screensize[1]
+        cls._aspect = 1. * screensize[0] / screensize[1]
         pygame.init()
-        pygame.display.set_caption(title)
-        Input.setmousevisibility(False)
         params = pgl.OPENGL | pgl.DOUBLEBUF
-        # params |= pgl.HWSURFACE
-        pygame.display.set_mode(self.screensize, params)
-        path = os.path.join('..', '..', 'icon.png')
-        icon = pygame.image.load(path).convert_alpha()
+        if hwsurface:
+            params |= pgl.HWSURFACE
+        pygame.display.set_mode(screensize, params)
+    @classmethod
+    def setwindowtitle(cls, title):
+        pygame.display.set_caption(title)
+    @classmethod
+    def setwindowicon(cls, path):
+        comppath = os.path.join(*path)
+        icon = pygame.image.load(comppath).convert_alpha()
         pygame.display.set_icon(icon)
-        
-        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
-        glShadeModel(GL_SMOOTH)
-        glDepthFunc(GL_LEQUAL)
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glPointSize(10)
+    @classmethod
+    def initmodelviewmatrix(cls):
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+    @classmethod
+    def clearscreen(cls):
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
-        glFogfv(GL_FOG_COLOR, (.5, .5, .5, .5))
-        glFogi(GL_FOG_MODE, GL_LINEAR)
-        glFogf(GL_FOG_DENSITY, .35)
-        glHint(GL_FOG_HINT, GL_NICEST)
-        glFogf(GL_FOG_START, 10.0)
-        glFogf(GL_FOG_END, 125.0)
-        glAlphaFunc(GL_GEQUAL, .5)
-        glClearColor(0, 0, 0, 0)
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-        glFrontFace(GL_CCW)
-        glCullFace(GL_BACK)
-        # Enabling stuff
+    @classmethod
+    def enable(cls):
         glEnable(GL_FOG)
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_COLOR_MATERIAL)
@@ -323,65 +428,90 @@ class Game(object):
         glEnable(GL_BLEND)
         glEnable(GL_SCISSOR_TEST)
         glEnable(GL_CULL_FACE)
-        
-    def addgameobject(self, gameobject):
-        self.__addgameobject(gameobject)
-    def addgameobjects(self, *gameobjects):
-        for gameobject in gameobjects:
-            self.__addgameobject(gameobject)
-    def removegameobject(self, gameobject):
-        self.gameobjects.remove(gameobject)
-        gameobject.scene = None
-
-    def renderloop(self):
-        # Viewport
-        glViewport(0, 0, *self.screensize)
-        # Projection
+    @classmethod
+    def setviewport(cls):
+        glViewport(0, 0, cls._screenwidth, cls._screenheight)
+    @classmethod
+    def setperspective(cls):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        view_angle = 45
-        close_view = 0.1
-        far_view = 100.0
-        gluPerspective(view_angle, 1.0 * self.screensize[0] / self.screensize[1], close_view, far_view)
-        # Initialize ModelView matrix
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
-        # Clear screen
+        gluPerspective(cls._viewangle, cls._aspect, cls._closeview, cls._farview)
+    @classmethod
+    def dostuff(cls):
+        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
+        glShadeModel(GL_SMOOTH)
+        glDepthFunc(GL_LEQUAL)
+        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glPointSize(10)
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
-        
-        if self.camera: self.camera.push()
-        for light in self.lights: light.enable()
-        glEnable(GL_ALPHA_TEST)
-        for gameobject in self.gameobjects:
-            gameobject.render()
-        glDisable(GL_ALPHA_TEST)
-        if self.camera: self.camera.pop()
+        glFogfv(GL_FOG_COLOR, (.5, .5, .5, 1))
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        glFogf(GL_FOG_DENSITY, .35)
+        glHint(GL_FOG_HINT, GL_NICEST)
+        glFogf(GL_FOG_START, 10.0)
+        glFogf(GL_FOG_END, 125.0)
+        glAlphaFunc(GL_GEQUAL, .5)
+        glClearColor(*Color.gray)
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
+        glFrontFace(GL_CCW)
+        glCullFace(GL_BACK)
+    @classmethod
+    def flip(cls):
         pygame.display.flip()
+    @classmethod
+    def quit(cls):
+        pygame.quit()
 
+
+class Scene(GameObject):
+    pass
+
+
+class Game(object):
+    def __init__(self, screensize=(800, 600), title="Pyngine game", hwsurface=False):
+        self.screensize = screensize
+        self.title = title
+        self.camera = None
+        self.lights = []
+        self._root = GameObject()
+        RenderCore.init(screensize, hwsurface)
+        RenderCore.setwindowtitle(title)
+        RenderCore.setwindowicon(['..', '..', 'icon.png'])
+        RenderCore.dostuff()
+        RenderCore.enable()
+    
+    # ===== Mainloop =====
     def mainloop(self, fps=60):
-        try: self.__mainloop(fps)
-        except Error as e: print "Oops! %s: %s" % (e.errno, e.strerror)
-        finally: pygame.quit()
-
-    def __addgameobject(self, gameobject):
-        self.gameobjects.append(gameobject)
-        gameobject.scene = self
-        for c in gameobject.components:
-            if isinstance(c, Camera):
-                self.camera = c
-            if isinstance(c, Light):
-                self.lights.append(c)
-
-    def __mainloop(self, fps):
+        try:
+            self._mainloop(fps)
+        except Error as e:
+            print "Oops! %s: %s" % (e.errno, e.strerror)
+        finally:
+            RenderCore.quit()
+    def _mainloop(self, fps):
         step = 1. / fps
         clock = pygame.time.Clock()
         while not Input.quitflag:
             Input.update()
-            for gameobject in self.gameobjects:
-                gameobject.update()
-            self.renderloop()
-            self.world.step(step)
+            self._root.update()
+            self._renderloop()
+            GameObject._world.step(step)
             clock.tick(fps)
+    def _renderloop(self):
+        RenderCore.setviewport()
+        RenderCore.setperspective()
+        RenderCore.initmodelviewmatrix()
+        RenderCore.clearscreen()
+        
+        if GameObject._camera: GameObject._camera.push()
+        for light in GameObject._lights: light.enable()
+        glEnable(GL_ALPHA_TEST)
+        self._root.render()
+        glDisable(GL_ALPHA_TEST)
+        if GameObject._camera: GameObject._camera.pop()
+        RenderCore.flip()
+
 
 
 # ==============================
@@ -423,35 +553,6 @@ class Input(object):
         pygame.mouse.set_visible(boolean)
 
 
-# ==============================
-# Color
-# ==============================
-
-class MetaColor(type):
-    @property
-    def red(cls): return cls(1, 0, 0, 1)  # @NoSelf
-    @property
-    def green(cls): return cls(0, 1, 0, 1)  # @NoSelf
-    @property
-    def blue(cls): return cls(0, 0, 1, 1)  # @NoSelf
-    @property
-    def yellow(cls): return cls(1, 1, 0, 1)  # @NoSelf
-    @property
-    def magenta(cls): return cls(1, 0, 1, 1)  # @NoSelf
-    @property
-    def cyan(cls): return cls(0, 1, 1, 1)  # @NoSelf
-    @property
-    def black(cls): return cls(0, 0, 0, 1)  # @NoSelf
-    @property
-    def white(cls): return cls(1, 1, 1, 1)  # @NoSelf
-
-class Color(object):
-    __metaclass__ = MetaColor
-    def __init__(self, r=0, g=0, b=0, a=1):
-        self.__color = (r, g, b, a)
-    def __getitem__(self, index):
-        return self.__color[index]
-
 
 # ==============================
 # Example
@@ -486,34 +587,41 @@ class ExampleMoveComponent(Component):
 class ExampleGame(Game):
     def __init__(self):
         Game.__init__(self)
+        scene = Scene()
         
         cameraobj = GameObject()
         cameraobj.addcomponent(Camera((0, 0, 10)))
         cameraobj.addcomponent(ExampleMoveComponent())
-        
         lightobj1 = GameObject(Transform((0, 7, 0)))
         lightobj1.addcomponent(Light())
-        
         lightobj2 = GameObject(Transform((7, 0, 0)))
         lightobj2.addcomponent(Light())
+        scene.addgameobjects(cameraobj, lightobj1, lightobj2)
         
         t1 = Transform(position=(0, 0, 0), scale=(2, 2, 2))
-        cubeobj1 = CubePrimitive(transform=t1, color=Color.red, world=self.world)
+        cubeobj1 = CubePrimitive(transform=t1, color=Color.red)
         cubeobj1.addcomponent(ExampleScaleComponent())
         
-        cubeobj2 = CubePrimitive(Transform((0, 2, 2)), Color.green, self.world)
+        cubeobj2 = CubePrimitive(Transform((0, 2, 2)), Color.green)
         cubeobj2.addcomponent(ExampleComponent())
         
-        cubeobj3 = CubePrimitive(Transform((0, -5, -5)), Color.blue, self.world)
+        cubeobj3 = CubePrimitive(Transform((0, -5, -5)), Color.blue)
         cubeobj3.addcomponent(ExampleComponent())
         cubeobj3.rigidbody.addforce((0, 50, 0))
         
-        cubeobj4 = CubePrimitive(Transform((0, 2, -5)), Color.yellow, self.world)
+        cubeobj4 = SpherePrimitive(Transform((0, 2, -5)), Color.yellow)
         cubeobj4.addcomponent(ExampleComponent())
         cubeobj4.rigidbody.addforce((0, -50, 0))
         
-        self.addgameobjects(cameraobj, lightobj1, lightobj2)
-        self.addgameobjects(cubeobj1, cubeobj2, cubeobj3, cubeobj4)
+        scene.addgameobjects(cubeobj1, cubeobj2, cubeobj3, cubeobj4)
+        
+        self._root = scene
+        
+        """
+        cube = CubePrimitive(Transform((2, 0, 0)), Color.blue)
+        sphere = SpherePrimitive(Transform((-2, 0, 0)), Color.yellow)
+        self.addgameobjects(cube, sphere)
+        """
 
 game = ExampleGame()
 game.mainloop()
