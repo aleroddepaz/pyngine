@@ -8,6 +8,8 @@ from OpenGL.GL import *  # @UnusedWildImport
 from OpenGL.GLU import *  # @UnusedWildImport
 
 
+world = ode.World()
+
 
 # ==============================
 # Component & Subclasses
@@ -31,15 +33,15 @@ class Renderer(Component):
         self.gl_list = glGenLists(1)
         self.color = color
     def render(self):
-        x, y, z = self.transform.getposition()
-        a, b, c = self.transform.getrotation()
+        x, y, z = self.transform.position
+        a, b, c = self.transform.rotation
         glPushMatrix()
         glTranslatef(x, y, -z)
         glRotatef(a, 1, 0, 0)
         glRotatef(b, 0, 1, 0)
         glRotatef(c, 0, 0, 1)
         if self.transform.scale != (1, 1, 1):
-            glScalef(*self.transform.getscale())
+            glScalef(*self.transform.scale)
         glColor(*self.color)
         glCallList(self.gl_list)
         glPopMatrix()
@@ -56,7 +58,7 @@ class Rigidbody(Component):
     def __init__(self):
         Component.__init__(self)
     def addforce(self, force):
-        self.body.addForce(force)
+        self.transform.body.addForce(force)
     def oncollision(self):
         pass
 
@@ -64,23 +66,36 @@ class Rigidbody(Component):
 class Transform(Component):
     def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
         Component.__init__(self)
-        self.body = ode.Body(GameObject._world)
-        self.setPosition(position)
-        self.setRotation(rotation)
-        self.scale = scale
+        self.body = ode.Body(world)
+        self.position = position
+        # self.rotation = ???
+        self._scale = scale
         self.right = (1, 0, 0)
         self.up = (0, 1, 0)
         self.forward = (0, 0, 1)
-    def getposition(self):
+    @property
+    def position(self):
         return self.body.getPosition()
-    def getrotation(self):
-        return self.body.getRotation()
-    def getscale(self):
-        return self.scale
+    @position.setter
+    def position(self, value):
+        self.body.setPosition(value)
+    @property
+    def rotation(self):
+        return self.body.getQuaternion()[:3]
+    @rotation.setter
+    def rotation(self, value):
+        a,b,c = value
+        return self.body.setQuaternion([a,b,c,0])
+    @property
+    def scale(self):
+        return self._scale
+    @scale.setter
+    def scale(self, value):
+        self._scale = value
     def move(self, position):
         self.body.setPosition(map(sum, zip(self.position, position)))
     def rotate(self, rotation):
-        self.body.setRotation(map(sum, zip(self.rotation, rotation)))
+        self.body.setQuaternion(map(sum, zip(self.rotation, rotation)) + [0])
     def rotatearound(self, other):
         pass  # TO DO
     def lookat(self, other):
@@ -223,15 +238,15 @@ class Cube(Renderer):
             glEnd()
         glEndList()
 
-
+"""
 class CubeCollider(Rigidbody):
     def __init__(self, size=(1, 1, 1), density=1):
         Rigidbody.__init__(self)
         self.size = size
         mass = ode.Mass()
         mass.setBox(density, *size)
-        self.body.setMass(mass)
-
+        self.transform.body.setMass(mass)
+"""
 
 
 # ==============================
@@ -241,7 +256,6 @@ class CubeCollider(Rigidbody):
 class GameObject(object):
     _camera = None
     _lights = []
-    _world = ode.World()
     def __init__(self, transform=Transform(), *components):
         self.parent = None
         self.children = []
@@ -323,21 +337,21 @@ class GameObject(object):
         self.children.append(gameobject)
         gameobject.parent = self
     def removegameobject(self, gameobject):
-        self.gameobjects.remove(gameobject)
+        self.children.remove(gameobject)
         gameobject.parent = None
 
 class CubePrimitive(GameObject):
     def __init__(self, transform, color, density=1):
         GameObject.__init__(self, transform)
         self.addcomponent(Cube(color))
-        self.addcomponent(CubeCollider(transform.scale, density))
+        self.addcomponent(Rigidbody())
 
 
 class SpherePrimitive(GameObject):
     def __init__(self, transform, color, density=1):
         GameObject.__init__(self, transform)
         self.addcomponent(Sphere(color))
-        self.addcomponent(CubeCollider(transform.scale, density))
+        self.addcomponent(Rigidbody())
 
 
 
@@ -496,7 +510,7 @@ class Game(object):
             Input.update()
             self._root.update()
             self._renderloop()
-            GameObject._world.step(step)
+            world.step(step)
             clock.tick(fps)
     def _renderloop(self):
         RenderCore.setviewport()
@@ -597,7 +611,7 @@ class ExampleGame(Game):
         lightobj2 = GameObject(Transform((7, 0, 0)))
         lightobj2.addcomponent(Light())
         scene.addgameobjects(cameraobj, lightobj1, lightobj2)
-        
+
         t1 = Transform(position=(0, 0, 0), scale=(2, 2, 2))
         cubeobj1 = CubePrimitive(transform=t1, color=Color.red)
         cubeobj1.addcomponent(ExampleScaleComponent())
@@ -614,7 +628,7 @@ class ExampleGame(Game):
         cubeobj4.rigidbody.addforce((0, -50, 0))
         
         scene.addgameobjects(cubeobj1, cubeobj2, cubeobj3, cubeobj4)
-        
+
         self._root = scene
         
         """
