@@ -68,7 +68,7 @@ class Transform(Component):
         Component.__init__(self)
         self.body = ode.Body(world)
         self.position = position
-        # self.rotation = ???
+        self.rotation = rotation
         self._scale = scale
         self.right = (1, 0, 0)
         self.up = (0, 1, 0)
@@ -81,11 +81,10 @@ class Transform(Component):
         self.body.setPosition(value)
     @property
     def rotation(self):
-        return self.body.getQuaternion()[:3]
+        return self._rotation
     @rotation.setter
     def rotation(self, value):
-        a,b,c = value
-        return self.body.setQuaternion([a,b,c,0])
+        self._rotation = value
     @property
     def scale(self):
         return self._scale
@@ -93,9 +92,9 @@ class Transform(Component):
     def scale(self, value):
         self._scale = value
     def move(self, position):
-        self.body.setPosition(map(sum, zip(self.position, position)))
+        self.position = map(sum, zip(self.position, position))
     def rotate(self, rotation):
-        self.body.setQuaternion(map(sum, zip(self.rotation, rotation)) + [0])
+        self.rotation = map(sum, zip(self.rotation, rotation))
     def rotatearound(self, other):
         pass  # TO DO
     def lookat(self, other):
@@ -238,15 +237,6 @@ class Cube(Renderer):
             glEnd()
         glEndList()
 
-"""
-class CubeCollider(Rigidbody):
-    def __init__(self, size=(1, 1, 1), density=1):
-        Rigidbody.__init__(self)
-        self.size = size
-        mass = ode.Mass()
-        mass.setBox(density, *size)
-        self.transform.body.setMass(mass)
-"""
 
 
 # ==============================
