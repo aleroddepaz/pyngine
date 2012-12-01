@@ -9,6 +9,7 @@ from OpenGL.GLU import *  # @UnusedWildImport
 
 
 world = ode.World()
+math.clamp = lambda x,y,z: min(max(x, y), z)
 
 
 # ==============================
@@ -102,13 +103,14 @@ class Transform(Component):
 
 
 class Camera(Component):
-    def __init__(self, distance=(0, 0, 0)):
+    def __init__(self, distance=(0, 0, 0), orientation=(0, 0, 0)):
         Component.__init__(self)
         self.distance = distance
+        self.orientation = orientation
     def push(self):
         dx, dy, dz = self.distance
         x, y, z = self.transform.position
-        a, b, c = self.transform.rotation
+        a, b, c = self.orientation
         glPushMatrix()
         glTranslatef(-dx, -dy, -dz)
         glRotatef(-a, 1, 0, 0)
@@ -118,12 +120,12 @@ class Camera(Component):
     def pop(self):
         glPopMatrix()
     def set_facing_matrix(self):
-        a, b, c = self.transform.rotation
+        a, b, c = self.orientation
         glRotatef(-a, 0, 0, 1)
         glRotatef(b, 0, 1, 0)
         glRotatef(c, 1, 0, 0)
     def set_skybox_data(self):
-        a, b, c = self.transform.rotation
+        a, b, c = self.orientation
         glRotatef(-a, 1, 0, 0)
         glRotatef(-b, 0, 1, 0)
         glRotatef(c, 0, 0, 1)
@@ -559,73 +561,49 @@ class Input(object):
 
 
 # ==============================
-# Example
+# Example: Pong
 # ==============================
 
-class ExampleComponent(Component):
-    def update(self):
-        self.transform.rotate((0, 0.5, 0))
-
-class ExampleScaleComponent(Component):
-    def start(self):
-        self.scalefactor = .98
-    def update(self):
-        self.transform.scale = map(lambda x: x*self.scalefactor, self.transform.scale)
-        if self.transform.scale[0] < 0.05: self.gameobject.destroy()
-
-class ExampleMoveComponent(Component):
+class ArrowMovement(Component):
     def start(self):
         self.speed = 0.1
     def update(self):
         speed = self.speed
-        if Input.getkey(pgl.K_z): speed *= 2
         if Input.getkey(pgl.K_UP): self.transform.move((0, 0, speed))
         if Input.getkey(pgl.K_DOWN): self.transform.move((0, 0, -speed))
-        if Input.getkey(pgl.K_RIGHT): self.transform.move((speed, 0, 0))
-        if Input.getkey(pgl.K_LEFT): self.transform.move((-speed, 0, 0))
-        if Input.getkey(pgl.K_w): self.transform.rotate((speed*5, 0, 0))
-        if Input.getkey(pgl.K_s): self.transform.rotate((-speed*5, 0, 0))
-        if Input.getkey(pgl.K_a): self.transform.rotate((0, speed*5, 0))
-        if Input.getkey(pgl.K_d): self.transform.rotate((0, -speed*5, 0))
+
+class WSMovement(Component):
+    def start(self):
+        self.speed = 0.1
+    def update(self):
+        speed = self.speed
+        if Input.getkey(pgl.K_w): self.transform.move((0, 0, speed))
+        if Input.getkey(pgl.K_s): self.transform.move((0, 0, -speed))
         
-class ExampleGame(Game):
+class Pong(Game):
     def __init__(self):
         Game.__init__(self)
         scene = Scene()
-        
-        cameraobj = GameObject()
-        cameraobj.addcomponent(Camera((0, 0, 10)))
-        cameraobj.addcomponent(ExampleMoveComponent())
+        cameraobj = GameObject(Transform((0, 0, 0)))
+        cameraobj.addcomponent(Camera(distance=(0, 5, 30), orientation=(0, 0, 0)))
         lightobj1 = GameObject(Transform((0, 7, 0)))
         lightobj1.addcomponent(Light())
-        lightobj2 = GameObject(Transform((7, 0, 0)))
-        lightobj2.addcomponent(Light())
-        scene.addgameobjects(cameraobj, lightobj1, lightobj2)
-
-        t1 = Transform(position=(0, 0, 0), scale=(2, 2, 2))
-        cubeobj1 = CubePrimitive(transform=t1, color=Color.red)
-        cubeobj1.addcomponent(ExampleScaleComponent())
+        scene.addgameobjects(cameraobj, lightobj1)
         
-        cubeobj2 = CubePrimitive(Transform((0, 2, 2)), Color.green)
-        cubeobj2.addcomponent(ExampleComponent())
-        
-        cubeobj3 = CubePrimitive(Transform((0, -5, -5)), Color.blue)
-        cubeobj3.addcomponent(ExampleComponent())
-        cubeobj3.rigidbody.addforce((0, 50, 0))
-        
-        cubeobj4 = SpherePrimitive(Transform((0, 2, -5)), Color.yellow)
-        cubeobj4.addcomponent(ExampleComponent())
-        cubeobj4.rigidbody.addforce((0, -50, 0))
-        
-        scene.addgameobjects(cubeobj1, cubeobj2, cubeobj3, cubeobj4)
+        t1 = Transform(position=(-10, 0, 0), scale=(1, 1, 5))
+        paddle1 = CubePrimitive(transform=t1, color=Color.red)
+        paddle1.addcomponent(WSMovement())
+        t2 = Transform(position=(10, 0, 0), scale=(1, 1, 5))
+        paddle2 = CubePrimitive(transform=t2, color=Color.red)
+        paddle2.addcomponent(ArrowMovement())
+        t3 = Transform(position=(0, 0, 15), scale=(30, 1, 1))
+        limit1 = CubePrimitive(transform=t3, color=Color.black)
+        t4 = Transform(position=(0, 0, -15), scale=(30, 1, 1))
+        limit2 = CubePrimitive(transform=t4, color=Color.black)
+        ball = SpherePrimitive(Transform((0, 0, 0)), Color.white)
+        scene.addgameobjects(paddle1, paddle2, ball, limit1, limit2)
 
         self._root = scene
-        
-        """
-        cube = CubePrimitive(Transform((2, 0, 0)), Color.blue)
-        sphere = SpherePrimitive(Transform((-2, 0, 0)), Color.yellow)
-        self.addgameobjects(cube, sphere)
-        """
 
-game = ExampleGame()
+game = Pong()
 game.mainloop()
