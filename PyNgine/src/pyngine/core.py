@@ -3,12 +3,36 @@ import ode
 import math
 import pygame
 import pygame.locals as pgl
-from itertools import imap
+from random import random
 from OpenGL.GL import *  # @UnusedWildImport
 from OpenGL.GLU import *  # @UnusedWildImport
 
 
 world = ode.World()
+world.setGravity((0, -9.8, 0))
+world.setERP(.8)
+world.setCFM(1e-5)
+space = ode.Space()
+floor = ode.GeomPlane(space, (0, 1, 0), -.5)
+contactgroup = ode.JointGroup()
+
+
+def near_callback(args, geom1, geom2):
+    world, contactgroup = args
+    mu = 0
+    if geom1 and geom1 != floor and geom2 and geom2 != floor:
+        geom1.gameobject.oncollision(geom2.gameobject)
+        geom2.gameobject.oncollision(geom1.gameobject)
+        mu1 = geom1.gameobject.rigidbody.mu
+        mu2 = geom2.gameobject.rigidbody.mu
+        mu = min(mu1, mu2)
+    for contact in ode.collide(geom1, geom2):
+        contact.setBounce(0)
+        contact.setMu(mu)
+        j = ode.ContactJoint(world, contactgroup, contact)
+        j.attach(geom1.getBody(), geom2.getBody())
+
+
 math.clamp = lambda x,y,z: min(max(x, y), z)
 
 
@@ -20,9 +44,12 @@ class Component(object):
     def __init__(self):
         self.gameobject = None
         self.transform = None
+        self.rigidbody = None
     def start(self):
         pass
     def update(self):
+        pass
+    def oncollision(self, other):
         pass
     def handlemessage(self, string, data):
         pass
@@ -56,30 +83,60 @@ class Renderer(Component):
 
 
 class Rigidbody(Component):
-    def __init__(self):
+    def __init__(self, density):
         Component.__init__(self)
+        self.mu = 1
+        self.density = density
+        self._freezeposition = False
+        self._freezerotation = False
+    def start(self):
+        scale = self.transform.scale
+        body = self.transform._body
+        body.enable()
+        mass = ode.Mass()
+        mass.setBox(self.density, *scale)
+        body.setMass(mass)
+        self.geom = ode.GeomBox(space, lengths=scale)
+        self.geom.setBody(body)
+        
+        self.geom.gameobject = self.gameobject
     def addforce(self, force):
-        self.transform.body.addForce(force)
-    def oncollision(self):
-        pass
+        self.transform._body.addForce(force)
+    def freezeposition(self, boolean):
+        self._freezeposition = boolean
+    def update(self):
+        if self._freezeposition:
+            self.transform.position = self.transform.startposition
+    @property
+    def usegravity(self):
+        return self.transform._body.getGravityMode()
+    @usegravity.setter
+    def usegravity(self, value):
+        self.transform._body.setGravityMode(value)
+    @property
+    def velocity(self):
+        return self.transform._body.getLinearVel()
+    @velocity.setter
+    def velocity(self, value):
+        self.transform._body.setLinearVel(value)
 
 
 class Transform(Component):
     def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
         Component.__init__(self)
-        self.body = ode.Body(world)
+        self._body = ode.Body(world)
+        self._body.disable()
         self.position = position
         self.rotation = rotation
-        self._scale = scale
-        self.right = (1, 0, 0)
-        self.up = (0, 1, 0)
-        self.forward = (0, 0, 1)
+        self.scale = scale
+        self.startposition = position
+        self.startrotation = rotation
     @property
     def position(self):
-        return self.body.getPosition()
+        return self._body.getPosition()
     @position.setter
     def position(self, value):
-        self.body.setPosition(value)
+        self._body.setPosition(value)
     @property
     def rotation(self):
         return self._rotation
@@ -111,6 +168,9 @@ class Camera(Component):
         dx, dy, dz = self.distance
         x, y, z = self.transform.position
         a, b, c = self.orientation
+        
+        a = -20
+        
         glPushMatrix()
         glTranslatef(-dx, -dy, -dz)
         glRotatef(-a, 1, 0, 0)
@@ -168,7 +228,7 @@ class Sphere(Renderer):
         verts = []
         texcs = []
         norms = []
-        space = 15 #self.detail
+        space = 20 #self.detail
         for meridian in xrange(0, 180, space):
             for parallels in xrange(0, 360, space):
                 _v = []
@@ -253,13 +313,11 @@ class GameObject(object):
         self.children = []
         self.name = ''
         self.tag = ''
-        
         self.transform = transform
         self.rigidbody = None
-        self.components = []
         self.renderables = []
-        for c in components:
-            if c != None: self.addcomponent(c)
+        self.components = []
+        for c in components: self.addcomponent(c)
 
     def addcomponent(self, component):
         if isinstance(component, Camera):
@@ -270,6 +328,7 @@ class GameObject(object):
         self._checkcomponent('rigidbody', component)
         component.gameobject = self
         component.transform = self.transform
+        component.rigidbody = self.rigidbody
         component.start()
         
     def removecomponent(self, component):
@@ -308,8 +367,8 @@ class GameObject(object):
             getattr(self.renderables, action)(component)
             
     def handlemessage(self, string, data=None):
-        gen = imap(lambda x: x.handlemessage(string, data), self.components)
-        for result in gen:
+        for component in self.components:
+            result = component.handlemessage(string, data)
             if result != None: return result
     def update(self):
         for component in self.components: component.update()
@@ -317,6 +376,8 @@ class GameObject(object):
     def render(self):
         for component in self.renderables: component.render()
         for gameobject in self.children: gameobject.render()
+    def oncollision(self, other):
+        for component in self.components: component.oncollision(other)
     def destroy(self):
         self.parent.removegameobject(self)
     
@@ -332,18 +393,15 @@ class GameObject(object):
         self.children.remove(gameobject)
         gameobject.parent = None
 
+
 class CubePrimitive(GameObject):
-    def __init__(self, transform, color, density=1):
-        GameObject.__init__(self, transform)
-        self.addcomponent(Cube(color))
-        self.addcomponent(Rigidbody())
+    def __init__(self, transform, color, density=10):
+        GameObject.__init__(self, transform, Rigidbody(density), Cube(color))
 
 
 class SpherePrimitive(GameObject):
-    def __init__(self, transform, color, density=1):
-        GameObject.__init__(self, transform)
-        self.addcomponent(Sphere(color))
-        self.addcomponent(Rigidbody())
+    def __init__(self, transform, color, density=10):
+        GameObject.__init__(self, transform, Rigidbody(density), Sphere(color))
 
 
 
@@ -502,7 +560,9 @@ class Game(object):
             Input.update()
             self._root.update()
             self._renderloop()
+            space.collide((world,contactgroup), near_callback)
             world.step(step)
+            contactgroup.empty()
             clock.tick(fps)
     def _renderloop(self):
         RenderCore.setviewport()
@@ -566,7 +626,7 @@ class Input(object):
 
 class ArrowMovement(Component):
     def start(self):
-        self.speed = 0.1
+        self.speed = 0.2
     def update(self):
         speed = self.speed
         if Input.getkey(pgl.K_UP): self.transform.move((0, 0, speed))
@@ -574,33 +634,50 @@ class ArrowMovement(Component):
 
 class WSMovement(Component):
     def start(self):
-        self.speed = 0.1
+        self.speed = 0.2
     def update(self):
         speed = self.speed
         if Input.getkey(pgl.K_w): self.transform.move((0, 0, speed))
         if Input.getkey(pgl.K_s): self.transform.move((0, 0, -speed))
-        
+
+class BallMovement(Component):
+    def start(self):
+        self.rigidbody.velocity = (10, 0, 5)
+    def oncollision(self, other):
+        x = self.rigidbody.velocity[0]
+        z = self.rigidbody.velocity[2] + random() * 2
+        if other.tag == 'Player': x *= -1
+        else: z *= -1
+        self.rigidbody.velocity = (x, 0, z)
+
 class Pong(Game):
     def __init__(self):
         Game.__init__(self)
         scene = Scene()
         cameraobj = GameObject(Transform((0, 0, 0)))
-        cameraobj.addcomponent(Camera(distance=(0, 5, 30), orientation=(0, 0, 0)))
+        cameraobj.addcomponent(Camera(distance=(0, 5, 40), orientation=(0, 0, 0)))
         lightobj1 = GameObject(Transform((0, 7, 0)))
         lightobj1.addcomponent(Light())
         scene.addgameobjects(cameraobj, lightobj1)
         
-        t1 = Transform(position=(-10, 0, 0), scale=(1, 1, 5))
+        t1 = Transform(position=(-8, 0, 0), scale=(1, 1, 5))
+        t2 = Transform(position=(8, 0, 0), scale=(1, 1, 5))
         paddle1 = CubePrimitive(transform=t1, color=Color.red)
         paddle1.addcomponent(WSMovement())
-        t2 = Transform(position=(10, 0, 0), scale=(1, 1, 5))
         paddle2 = CubePrimitive(transform=t2, color=Color.red)
         paddle2.addcomponent(ArrowMovement())
-        t3 = Transform(position=(0, 0, 15), scale=(30, 1, 1))
+        
+        t3 = Transform(position=(0, 0, 10), scale=(30, 1, 1))
+        t4 = Transform(position=(0, 0, -10), scale=(30, 1, 1))
         limit1 = CubePrimitive(transform=t3, color=Color.black)
-        t4 = Transform(position=(0, 0, -15), scale=(30, 1, 1))
         limit2 = CubePrimitive(transform=t4, color=Color.black)
-        ball = SpherePrimitive(Transform((0, 0, 0)), Color.white)
+        ball = SpherePrimitive(Transform((0, 0, -5)), Color.white)
+        ball.addcomponent(BallMovement())
+        
+        paddle1.tag = paddle2.tag = 'Player'
+        ball.tag = 'Ball'
+        ball.rigidbody.mu = 0
+        
         scene.addgameobjects(paddle1, paddle2, ball, limit1, limit2)
 
         self._root = scene
