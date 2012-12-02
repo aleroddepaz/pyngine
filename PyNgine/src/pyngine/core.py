@@ -62,12 +62,13 @@ class Renderer(Component):
         self.color = color
     def render(self):
         x, y, z = self.transform.position
-        a, b, c = self.transform.rotation
+        R = self.transform.rotation
+        rot = [R[0], R[3], R[6], 0,
+               R[1], R[4], R[7], 0,
+               R[2], R[5], R[8], 0,
+               x, y, -z, 1]
         glPushMatrix()
-        glTranslatef(x, y, -z)
-        glRotatef(a, 1, 0, 0)
-        glRotatef(b, 0, 1, 0)
-        glRotatef(c, 0, 0, 1)
+        glMultMatrixd(rot)
         if self.transform.scale != (1, 1, 1):
             glScalef(*self.transform.scale)
         glColor(*self.color)
@@ -82,13 +83,19 @@ class Renderer(Component):
         return (vx, vy, vz)
 
 
+class Collider(Component):
+    def __init__(self):
+        Component.__init__(self)
+        self.geom = None
+    def disable(self):
+        self.geom.disable()
+
+
 class Rigidbody(Component):
     def __init__(self, density):
         Component.__init__(self)
         self.mu = 1
         self.density = density
-        self._freezeposition = False
-        self._freezerotation = False
     def start(self):
         scale = self.transform.scale
         body = self.transform._body
@@ -96,17 +103,8 @@ class Rigidbody(Component):
         mass = ode.Mass()
         mass.setBox(self.density, *scale)
         body.setMass(mass)
-        self.geom = ode.GeomBox(space, lengths=scale)
-        self.geom.setBody(body)
-        
-        self.geom.gameobject = self.gameobject
     def addforce(self, force):
         self.transform._body.addForce(force)
-    def freezeposition(self, boolean):
-        self._freezeposition = boolean
-    def update(self):
-        if self._freezeposition:
-            self.transform.position = self.transform.startposition
     @property
     def usegravity(self):
         return self.transform._body.getGravityMode()
@@ -121,6 +119,32 @@ class Rigidbody(Component):
         self.transform._body.setLinearVel(value)
 
 
+class BoxCollider(Collider):
+    def __init__(self):
+        Collider.__init__(self)
+    def start(self):
+        Component.start(self)
+        scale = self.transform.scale
+        body = self.transform._body
+        self.geom = ode.GeomBox(space, lengths=scale)
+        self.geom.setBody(body)
+        self.geom.gameobject = self.gameobject
+
+
+class SphereCollider(Collider):
+    def __init__(self):
+        Collider.__init__(self)
+    def start(self):
+        Component.start(self)
+        x, y, z = self.transform.scale
+        if x!=y or x!=z:
+            print "WARNING: Only the x-coord of the scale will be used"
+        body = self.transform._body
+        self.geom = ode.GeomSphere(space, x/2.)
+        self.geom.setBody(body)
+        self.geom.gameobject = self.gameobject
+
+
 class Transform(Component):
     def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
         Component.__init__(self)
@@ -129,8 +153,6 @@ class Transform(Component):
         self.position = position
         self.rotation = rotation
         self.scale = scale
-        self.startposition = position
-        self.startrotation = rotation
     @property
     def position(self):
         return self._body.getPosition()
@@ -139,7 +161,7 @@ class Transform(Component):
         self._body.setPosition(value)
     @property
     def rotation(self):
-        return self._rotation
+        return self._body.getRotation()
     @rotation.setter
     def rotation(self, value):
         self._rotation = value
@@ -168,8 +190,6 @@ class Camera(Component):
         dx, dy, dz = self.distance
         x, y, z = self.transform.position
         a, b, c = self.orientation
-        
-        a = -20
         
         glPushMatrix()
         glTranslatef(-dx, -dy, -dz)
@@ -315,6 +335,7 @@ class GameObject(object):
         self.tag = ''
         self.transform = transform
         self.rigidbody = None
+        self.collider = None
         self.renderables = []
         self.components = []
         for c in components: self.addcomponent(c)
@@ -326,6 +347,7 @@ class GameObject(object):
         self._updatecomponents('append', component)
         self._checkcomponent('transform', component)
         self._checkcomponent('rigidbody', component)
+        self._checkcomponent('collider', component)
         component.gameobject = self
         component.transform = self.transform
         component.rigidbody = self.rigidbody
@@ -396,12 +418,12 @@ class GameObject(object):
 
 class CubePrimitive(GameObject):
     def __init__(self, transform, color, density=10):
-        GameObject.__init__(self, transform, Rigidbody(density), Cube(color))
+        GameObject.__init__(self, transform, Rigidbody(density), Cube(color), BoxCollider())
 
 
 class SpherePrimitive(GameObject):
     def __init__(self, transform, color, density=10):
-        GameObject.__init__(self, transform, Rigidbody(density), Sphere(color))
+        GameObject.__init__(self, transform, Rigidbody(density), Sphere(color), SphereCollider())
 
 
 
@@ -628,6 +650,7 @@ class ArrowMovement(Component):
     def start(self):
         self.speed = 0.2
     def update(self):
+        self.rigidbody.velocity = (0,0,0)
         speed = self.speed
         if Input.getkey(pgl.K_UP): self.transform.move((0, 0, speed))
         if Input.getkey(pgl.K_DOWN): self.transform.move((0, 0, -speed))
@@ -636,6 +659,7 @@ class WSMovement(Component):
     def start(self):
         self.speed = 0.2
     def update(self):
+        self.rigidbody.velocity = (0,0,0)
         speed = self.speed
         if Input.getkey(pgl.K_w): self.transform.move((0, 0, speed))
         if Input.getkey(pgl.K_s): self.transform.move((0, 0, -speed))
@@ -644,8 +668,8 @@ class BallMovement(Component):
     def start(self):
         self.rigidbody.velocity = (10, 0, 5)
     def oncollision(self, other):
-        x = self.rigidbody.velocity[0]
-        z = self.rigidbody.velocity[2] + random() * 2
+        x, _, z = self.rigidbody.velocity
+        z += random() * 2
         if other.tag == 'Player': x *= -1
         else: z *= -1
         self.rigidbody.velocity = (x, 0, z)
@@ -655,7 +679,7 @@ class Pong(Game):
         Game.__init__(self)
         scene = Scene()
         cameraobj = GameObject(Transform((0, 0, 0)))
-        cameraobj.addcomponent(Camera(distance=(0, 5, 40), orientation=(0, 0, 0)))
+        cameraobj.addcomponent(Camera(distance=(0, 5, 40), orientation=(-20, 0, 0)))
         lightobj1 = GameObject(Transform((0, 7, 0)))
         lightobj1.addcomponent(Light())
         scene.addgameobjects(cameraobj, lightobj1)
@@ -675,6 +699,7 @@ class Pong(Game):
         ball.addcomponent(BallMovement())
         
         paddle1.tag = paddle2.tag = 'Player'
+        limit1.tag = limit2.tag = 'Limit'
         ball.tag = 'Ball'
         ball.rigidbody.mu = 0
         
