@@ -49,8 +49,10 @@ class Pong(Game):
         
         t3 = Transform(position=(0, 0, 10), scale=(30, 1, 1))
         t4 = Transform(position=(0, 0, -10), scale=(30, 1, 1))
-        limit1 = CubePrimitive(transform=t3, color=Color.black, density=1000)
-        limit2 = CubePrimitive(transform=t4, color=Color.black, density=1000)
+        limit1 = GameObject(t3, BoxCollider(), Cube(Color.green))
+        limit2 = GameObject(t4, BoxCollider(), Cube(Color.green))
+        #limit1 = CubePrimitive(transform=t3, color=Color.black, density=1000)
+        #limit2 = CubePrimitive(transform=t4, color=Color.black, density=1000)
         ball = SpherePrimitive(Transform((0, 0, -5)), Color.white)
         ball.addcomponent(BallMovement())
         limit1.tag = limit2.tag = 'Limit'

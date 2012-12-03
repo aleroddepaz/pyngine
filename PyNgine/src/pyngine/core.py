@@ -18,9 +18,7 @@ contactgroup = ode.JointGroup()
 
 def near_callback(args, geom1, geom2):
     world, contactgroup = args
-    body1, body2 = geom1.getBody(), geom2.getBody()
-    if body1 is None: body1 = ode.environment
-    if body2 is None: body2 = ode.environment
+
     if geom1 and geom1 != floor and geom2 and geom2 != floor:
         geom1.gameobject.oncollision(geom2.gameobject)
         geom2.gameobject.oncollision(geom1.gameobject)
@@ -28,7 +26,7 @@ def near_callback(args, geom1, geom2):
         contact.setBounce(0)
         contact.setMu(0)
         j = ode.ContactJoint(world, contactgroup, contact)
-        j.attach(body1, body2)
+        j.attach(geom1.getBody(), geom2.getBody())
 
 
 math.clamp = lambda x,y,z: min(max(x, y), z)
@@ -41,14 +39,15 @@ math.clamp = lambda x,y,z: min(max(x, y), z)
 class Component(object):
     def __init__(self):
         self.gameobject = None
-        self.transform = None
-        self.rigidbody = None
-        self.collider = None
-    def _setgameobject(self, gameobject):
-        self.gameobject = gameobject
-        self.transform = gameobject.transform
-        self.rigidbody = gameobject.rigidbody
-        self.collider = gameobject.collider
+    @property
+    def transform(self):
+        return self.gameobject.transform
+    @property
+    def rigidbody(self):
+        return self.gameobject.rigidbody
+    @property
+    def collider(self):
+        return self.gameobject.collider
     def start(self):
         pass
     def update(self):
@@ -130,7 +129,7 @@ class BoxCollider(Collider):
         Component.start(self)
         self.geom = ode.GeomBox(space, self.transform.scale)
         self.geom.gameobject = self.gameobject
-        self.geom.setBody(self.transform._body)
+        #self.geom.setBody(self.transform._body)
 
 
 class SphereCollider(Collider):
@@ -358,7 +357,7 @@ class GameObject(object):
         self.__checkfield('transform', component)
         self.__checkfield('rigidbody', component)
         self.__checkfield('collider', component)
-        component._setgameobject(self)
+        component.gameobject = self
         component.start()
         
     def removecomponent(self, component):
@@ -372,8 +371,6 @@ class GameObject(object):
         if isinstance(component, eval(clsstring.capitalize())):
             oldcomponent = self.__dict__[clsstring]
             self.__dict__[clsstring] = component
-            for c in self.components:
-                c.__dict__[clsstring] = component
             self.removecomponent(oldcomponent)
             
     def __updatecomponents(self, action, component):
