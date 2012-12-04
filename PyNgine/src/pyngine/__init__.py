@@ -256,6 +256,10 @@ class GameObject(object):
         for c in self.components:
             if isinstance(c, cls):
                 return c
+    
+    def addcomponents(self, *components):
+        for component in components:
+            self.addcomponent(component)
 
     def addcomponent(self, component):
         if isinstance(component, Camera):
@@ -307,12 +311,12 @@ class GameObject(object):
     def destroy(self):
         self.parent.removegameobject(self)
 
-    def addgameobject(self, gameobject):
-        self._addgameobject(gameobject)
-
     def addgameobjects(self, *gameobjects):
         for gameobject in gameobjects:
             self._addgameobject(gameobject)
+
+    def addgameobject(self, gameobject):
+        self._addgameobject(gameobject)
 
     def _addgameobject(self, gameobject):
         self.children.append(gameobject)
