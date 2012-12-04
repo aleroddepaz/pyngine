@@ -1,35 +1,45 @@
 import os
 import ode
-import math
 import pygame
 import pygame.locals as pgl
 from OpenGL.GL import *  # @UnusedWildImport
 from OpenGL.GLU import *  # @UnusedWildImport
+from OpenGL.raw.GLUT import glutSolidCube, glutSolidSphere
 
 
-world = ode.World()
-world.setGravity((0, -9.8, 0))
-world.setERP(.8)
-world.setCFM(1e-5)
-space = ode.Space()
-floor = ode.GeomPlane(space, (0, 1, 0), -.5)
-contactgroup = ode.JointGroup()
 
-
-def near_callback(args, geom1, geom2):
-    world, contactgroup = args
-
-    if geom1 and geom1 != floor and geom2 and geom2 != floor:
-        geom1.gameobject.oncollision(geom2.gameobject)
-        geom2.gameobject.oncollision(geom1.gameobject)
-    for contact in ode.collide(geom1, geom2):
-        contact.setBounce(0)
-        contact.setMu(0)
-        j = ode.ContactJoint(world, contactgroup, contact)
-        j.attach(geom1.getBody(), geom2.getBody())
-
-
-math.clamp = lambda x,y,z: min(max(x, y), z)
+class PhysicsEngine(object):
+    world = ode.World()
+    space = ode.Space()
+    contactgroup = ode.JointGroup()
+    @classmethod
+    def start(cls, gravity=(0, -9.8, 0), erp=.8, cfm=1e-5):
+        cls.world = ode.World()
+        cls.world.setGravity(gravity)
+        cls.world.setERP(erp)
+        cls.world.setCFM(cfm)
+        cls.space = ode.Space()
+        cls.contactgroup = ode.JointGroup()
+    @classmethod
+    def step(cls, step):
+        cls.world.step(step)
+        cls.contactgroup.empty()
+    @classmethod
+    def collide(cls):
+        cls.space.collide(None, cls.__collidecallback)
+    @classmethod
+    def __collidecallback(cls, args, geom1, geom2):
+        go1 = geom1.gameobject
+        go2 = geom2.gameobject
+        go1.oncollision(go2)
+        go2.oncollision(go1)
+        for contact in ode.collide(geom1, geom2):
+            contact.setBounce(0)
+            contact.setMu(0)
+            if geom1.getBody().isEnabled() == 0: return
+            if geom2.getBody().isEnabled() == 0: return
+            j = ode.ContactJoint(cls.world, cls.contactgroup, contact)
+            j.attach(geom1.getBody(), geom2.getBody())
 
 
 # ==============================
@@ -86,28 +96,20 @@ class Renderer(Component):
         return (vx, vy, vz)
 
 
-class Collider(Component):
-    def __init__(self):
-        Component.__init__(self)
-        self.geom = None
-    def disable(self):
-        self.geom.disable()
-
-
 class Rigidbody(Component):
     def __init__(self, density):
         Component.__init__(self)
-        self.mu = 1
         self.density = density
     def start(self):
-        scale = self.transform.scale
         body = self.transform._body
         body.enable()
         mass = ode.Mass()
-        mass.setBox(self.density, *scale)
+        mass.setBox(self.density, *self.transform.scale)
         body.setMass(mass)
     def addforce(self, force):
         self.transform._body.addForce(force)
+    def isenabled(self):
+        return self.transform._body.isEnabled() == 1
     @property
     def usegravity(self):
         return self.transform._body.getGravityMode()
@@ -122,38 +124,43 @@ class Rigidbody(Component):
         self.transform._body.setLinearVel(value)
 
 
+class Collider(Component):
+    def __init__(self):
+        Component.__init__(self)
+        self.geom = None
+    def _latestart(self):
+        self.geom.gameobject = self.gameobject
+        self.geom.setBody(self.transform._body)
+        self.geom.getBody().disable()
+
+
 class BoxCollider(Collider):
     def __init__(self):
         Collider.__init__(self)
     def start(self):
-        Component.start(self)
-        self.geom = ode.GeomBox(space, self.transform.scale)
-        self.geom.gameobject = self.gameobject
-        #self.geom.setBody(self.transform._body)
+        self.geom = ode.GeomBox(PhysicsEngine.space, self.transform.scale)
+        self._latestart()
 
 
 class SphereCollider(Collider):
     def __init__(self):
         Collider.__init__(self)
     def start(self):
-        Component.start(self)
-        x, y, z = self.transform.scale
-        if x!=y or x!=z:
-            print "WARNING: Only the x-coord of the scale will be used"
-        body = self.transform._body
-        self.geom = ode.GeomSphere(space, x/2.)
-        self.geom.setBody(body)
-        self.geom.gameobject = self.gameobject
+        x = self.transform.scale[0]
+        self.geom = ode.GeomSphere(PhysicsEngine.space, x/2.)
+        self._latestart()
 
 
 class Transform(Component):
-    def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
+    def __init__(self, position=(0, 0, 0), rotation=(0,)*9, scale=(1, 1, 1)):
         Component.__init__(self)
-        self._body = ode.Body(world)
+        self._body = ode.Body(PhysicsEngine.world)
         self._body.disable()
         self.position = position
         self.rotation = rotation
         self.scale = scale
+    def start(self):
+        Component.start(self)
     @property
     def position(self):
         return self._body.getPosition()
@@ -165,7 +172,7 @@ class Transform(Component):
         return self._body.getRotation()
     @rotation.setter
     def rotation(self, value):
-        self._rotation = value
+        self._body.setRotation(value)
     @property
     def scale(self):
         return self._scale
@@ -245,82 +252,16 @@ class Sphere(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
-        self.verts = []
-        self.texcs = []
-        self.norms = []
-        self.detail = 20
-        for meridian in xrange(0, 180, self.detail):
-            for parallel in xrange(0, 360, self.detail):
-                self._addvertices(meridian, parallel)
-        glBegin(GL_TRIANGLES)
-        for i, vert in enumerate(self.verts):
-            u,v = self.texcs[i]
-            glTexCoord2f(u,v)
-            glNormal3f(*self.norms[i])
-            glVertex3f(*vert)
-        glEnd()
+        glutSolidSphere(.5, 18, 18)
         glEndList()
-    def _addvertices(self, meridian, parallel):
-        _v = []
-        _t = []
-        for i in xrange(2):
-            for j in xrange(2):
-                phi = (parallel + self.detail*i) / 180.
-                theta = (meridian + self.detail*j) / 180.
-                x = math.sin(phi*math.pi) * math.sin(theta*math.pi) * 0.5
-                z = math.cos(phi*math.pi) * math.sin(theta*math.pi) * 0.5
-                y = math.cos(theta*math.pi) * 0.5
-                _v.append((x,y,z))
-                _t.append((phi/2, 1 - theta))
-        self.verts.extend([_v[0], _v[1], _v[3], _v[0], _v[3], _v[2]])
-        self.texcs.extend([_t[0], _t[1], _t[3], _t[0], _t[3], _t[2]])
-        self.norms.extend([self.calculatenormal(*self.verts[-6:-3])]*3)
-        self.norms.extend([self.calculatenormal(*self.verts[-3::])]*3)
+
 
 class Cube(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
-        self.corners = [(-0.5, -0.5, 0.5),
-                      (0.5, -0.5, 0.5),  # toprightfront
-                      (0.5, 0.5, 0.5),  # bottomrightfront
-                      (-0.5, 0.5, 0.5),  # bottomleftfront
-                      (-0.5, -0.5, -0.5),  # topleftback
-                      (0.5, -0.5, -0.5),  # toprightback
-                      (0.5, 0.5, -0.5),  # bottomrightback
-                      (-0.5, 0.5, -0.5)]  # bottomleftback
-        self.sides = [(7, 4, 0, 3, 2, 2, 5),  # left
-                      (2, 1, 5, 6, 3, 4, 4),  # right
-                      (7, 3, 2, 6, 5, 0, 3),  # top
-                      (0, 4, 5, 1, 4, 5, 2),  # bottom
-                      (3, 0, 1, 2, 0, 1, 0),  # front
-                      (6, 5, 4, 7, 1, 3, 1)]  # back
-        self.normals = ((0, 0, 1),  # front
-                        (0, 0, -1),  # back
-                        (0, -1, 0),  # top
-                        (0, 1, 0),  # bottom
-                        (1, 0, 0),  # right
-                        (-1, 0, 0))  # left
-        self.split_coords = ((2, 2),  # top
-                             (0, 1),  # back
-                             (1, 1),  # left
-                             (2, 1),  # front
-                             (3, 1),  # right
-                             (2, 0))  # bottom
-        coords = ((1,1), (1,0), (0,0), (0,1))
         glNewList(self.gl_list, GL_COMPILE)
-        for i in self.sides:
-            ix = 0
-            x, _ = self.split_coords[i[5]]
-            glBegin(GL_QUADS)
-            glNormal3f(*self.normals[i[6]])
-            for x in i[:4]:
-                glTexCoord2fv(coords[ix])
-                a, b, c = self.corners[x]
-                glVertex3f(a,b,c)
-                ix += 1
-            glEnd()
+        glutSolidCube(1)
         glEndList()
-
 
 
 # ==============================
@@ -551,7 +492,9 @@ class RenderCore(object):
 
 
 class Scene(GameObject):
-    pass
+    def __init__(self, gravity=(0, -9.8, 0), erp=.8, cfm=1e-5):
+        GameObject.__init__(self, Transform())
+        PhysicsEngine.start(gravity, erp, cfm)
 
 
 class Game(object):
@@ -560,14 +503,12 @@ class Game(object):
         self.title = title
         self.camera = None
         self.lights = []
-        self._root = GameObject()
+        self.scene = Scene()
         RenderCore.init(screensize, hwsurface)
         RenderCore.setwindowtitle(title)
         RenderCore.setwindowicon(['..', '..', 'icon.png'])
         RenderCore.dostuff()
         RenderCore.enable()
-    
-    # ===== Mainloop =====
     def mainloop(self, fps=60):
         try:
             self._mainloop(fps)
@@ -580,11 +521,10 @@ class Game(object):
         clock = pygame.time.Clock()
         while not Input.quitflag:
             Input.update()
-            self._root.update()
+            self.scene.update()
             self._renderloop()
-            space.collide((world,contactgroup), near_callback)
-            world.step(step)
-            contactgroup.empty()
+            PhysicsEngine.collide()
+            PhysicsEngine.step(step)
             clock.tick(fps)
     def _renderloop(self):
         RenderCore.setviewport()
@@ -594,9 +534,7 @@ class Game(object):
         
         if GameObject._camera: GameObject._camera.push()
         for light in GameObject._lights: light.enable()
-        glEnable(GL_ALPHA_TEST)
-        self._root.render()
-        glDisable(GL_ALPHA_TEST)
+        self.scene.render()
         if GameObject._camera: GameObject._camera.pop()
         RenderCore.flip()
 
@@ -639,3 +577,24 @@ class Input(object):
     def setmousevisibility(cls, boolean):
         cls.mousevisibility = boolean
         pygame.mouse.set_visible(boolean)
+
+class Qwe(Component):
+    def update(self):
+        print self.transform.position
+
+
+class Platformer(Game):
+    def __init__(self):
+        Game.__init__(self)
+        camera = GameObject(Transform())
+        camera.addcomponent(Camera((0, 0, 20)))
+        light = GameObject(Transform())
+        light.addcomponent(Light())
+        cube = GameObject(Transform((0,1,0)), Cube(color=Color.white), BoxCollider(), Rigidbody(10000))
+        cube.rigidbody.usegravity = False
+        sphere = GameObject(Transform((0,10,0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
+        self.scene.addgameobjects(camera, cube, sphere)
+
+if __name__ == "__main__":
+    p = Platformer()
+    p.mainloop()

@@ -1,7 +1,6 @@
 from pyngine.core import * #@UnusedWildImport
 
 
-
 class KeyBoardMovement(Component):
     def __init__(self, keyup, keydown):
         Component.__init__(self)
@@ -33,9 +32,8 @@ class BallMovement(Component):
 class Pong(Game):
     def __init__(self):
         Game.__init__(self)
-        scene = Scene()
-        cameraobj = GameObject(Transform((0, 0, 0)))
-        cameraobj.addcomponent(Camera(distance=(0, 5, 40), orientation=(-20, 0, 0)))
+        cameraobj = GameObject(Transform())
+        cameraobj.addcomponent(Camera(distance=(0, 0, 10), orientation=(0, 0, 0)))
         lightobj1 = GameObject(Transform((0, 7, 0)))
         lightobj1.addcomponent(Light())
         
@@ -45,22 +43,21 @@ class Pong(Game):
         paddle1.addcomponent(WSMovement())
         paddle2 = CubePrimitive(transform=t2, color=Color.red)
         paddle2.addcomponent(ArrowMovement())
-        paddle1.tag = paddle2.tag = 'Player'
         
         t3 = Transform(position=(0, 0, 10), scale=(30, 1, 1))
         t4 = Transform(position=(0, 0, -10), scale=(30, 1, 1))
-        limit1 = GameObject(t3, BoxCollider(), Cube(Color.green))
-        limit2 = GameObject(t4, BoxCollider(), Cube(Color.green))
-        #limit1 = CubePrimitive(transform=t3, color=Color.black, density=1000)
-        #limit2 = CubePrimitive(transform=t4, color=Color.black, density=1000)
+        limit1 = CubePrimitive(transform=t3, color=Color.black, density=10000)
+        limit2 = CubePrimitive(transform=t4, color=Color.black, density=10000)
         ball = SpherePrimitive(Transform((0, 0, -5)), Color.white)
         ball.addcomponent(BallMovement())
+        
+        paddle1.tag = paddle2.tag = 'Player'
         limit1.tag = limit2.tag = 'Limit'
         ball.tag = 'Ball'
         
-        scene.addgameobjects(cameraobj, lightobj1, paddle1, paddle2, ball, limit1, limit2)
-        self._root = scene
+        self.scene.addgameobjects(cameraobj, lightobj1, paddle1, paddle2, ball, limit1, limit2)
 
+        
 if __name__ == "__main__":
     game = Pong()
     game.mainloop()
