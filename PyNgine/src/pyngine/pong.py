@@ -1,4 +1,4 @@
-from pyngine.core import * #@UnusedWildImport
+from pyngine import * #@UnusedWildImport
 
 
 class KeyBoardMovement(Component):
@@ -14,11 +14,11 @@ class KeyBoardMovement(Component):
         
 class ArrowMovement(KeyBoardMovement):
     def __init__(self):
-        KeyBoardMovement.__init__(self, pgl.K_UP, pgl.K_DOWN)
+        KeyBoardMovement.__init__(self, pygame.K_UP, pygame.K_DOWN)
 
 class WSMovement(KeyBoardMovement):
     def __init__(self):
-        KeyBoardMovement.__init__(self, pgl.K_w, pgl.K_s)
+        KeyBoardMovement.__init__(self, pygame.K_w, pygame.K_s)
 
 class BallMovement(Component):
     def start(self):

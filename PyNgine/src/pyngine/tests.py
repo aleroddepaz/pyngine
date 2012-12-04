@@ -1,5 +1,5 @@
 import unittest
-from pyngine.core import * # @UnusedWildImport
+from pyngine import * # @UnusedWildImport
 
 
 class ExampleComponent(Component):
