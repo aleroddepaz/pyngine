@@ -20,7 +20,7 @@ class Jump(Component):
 
 class Platform(GameObject):
     def __init__(self, pos, size):
-        GameObject.__init__(self, Transform(position=pos, size=size))
+        GameObject.__init__(self, Transform(position=pos, scale=size))
         self.addcomponents(Cube(color=Color.white), BoxCollider(), Rigidbody(10000))
         self.rigidbody.usegravity = False
         
@@ -28,15 +28,15 @@ class Platform(GameObject):
 class Platformer(Game):
     def __init__(self):
         Game.__init__(self)
-        light = GameObject(Transform((0,10,-5)))
+        light = GameObject(Transform((0,5,-5)))
         light.addcomponent(Light())
         
-        platform1 = Platform(pos=(0,1,0), size=(10,1,2))
-        platform2 = Platform(pos=(12,3,0), size=(10,1,2))
+        platform1 = Platform(pos=(0, 1 ,0), size=(10, 1, 2))
+        platform2 = Platform(pos=(12, 3, 0), size=(10, 1, 2))
 
-        sphere = GameObject(Transform((0,10,0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
-        sphere.addcomponent(Camera((0, 0, 20)), Jump())
-        self.scene.addgameobjects(platform1, platform2, sphere)
+        sphere = GameObject(Transform((0, 7, 0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
+        sphere.addcomponents(Camera((0, 0, 20)), Jump())
+        self.scene.addgameobjects(light,platform1, platform2, sphere)
 
 if __name__ == "__main__":
     p = Platformer()

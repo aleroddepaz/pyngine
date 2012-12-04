@@ -215,10 +215,12 @@ class Light(Component):
 
 
 class Sphere(Renderer):
+    slices = 18
+    stacks = 18
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
-        glutSolidSphere(.5, 18, 18)
+        glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
         glEndList()
 
 
