@@ -40,25 +40,18 @@ class TestTransform(unittest.TestCase):
 class TestCollider(unittest.TestCase):
     def setUp(self):
         self.collider = BoxCollider()
-        self.gameobject = GameObject(Transform((0, 0, 0)))
+        self.gameobject = GameObject(Transform((0,0,0)))
     def tearDown(self):
         PhysicsEngine.start()
     def testStart1(self):
         self.gameobject.addcomponent(self.collider)
-        assert self.collider.geom.placeable() == True
+        assert self.collider._geom.placeable() == True
     def testStart2(self):
         self.gameobject.addcomponent(self.collider)
-        assert self.collider.geom.isEnabled() == 1
+        assert self.collider._geom.isEnabled() == 1
     def testStart3(self):
         self.gameobject.addcomponent(self.collider)
-        assert self.collider.geom.getBody() != None
-    def testStart4(self):
-        self.gameobject.addcomponent(self.collider)
-        assert self.collider.geom.getBody().isEnabled() == 0
-    def testStart5(self):
-        self.gameobject.addcomponent(self.collider)
-        self.gameobject.addcomponent(Rigidbody(1))
-        assert self.collider.geom.getBody().isEnabled() == 1
+        assert self.collider._geom.getBody() == None
     def testUpdate1(self):
         self.gameobject.addcomponent(self.collider)
         position_pre = self.gameobject.transform.position

@@ -29,33 +29,43 @@ class BallMovement(Component):
         else: z *= -1
         self.rigidbody.velocity = (x, 0, z)
 
+
+class Paddle(GameObject):
+    def __init__(self, pos):
+        GameObject.__init__(self, Transform(position=pos,
+                                            scale=(1, 1, 5)))
+        self.addcomponents(BoxCollider(), Cube(Color.red))
+        self.tag = 'Player'
+
+
+class Limit(GameObject):
+    def __init__(self, pos):
+        GameObject.__init__(self, Transform(position=pos,
+                                            scale=(30, 1, 1)))
+        self.addcomponents(BoxCollider(), Cube(Color.green))
+        self.tag = 'Limit'
+
+
 class Pong(Game):
     def __init__(self):
         Game.__init__(self)
-        cameraobj = GameObject(Transform())
-        cameraobj.addcomponent(Camera(distance=(0, 0, 10), orientation=(0, 0, 0)))
-        lightobj1 = GameObject(Transform((0, 7, 0)))
-        lightobj1.addcomponent(Light())
+        lightobj = GameObject(Transform((0, 7, 0)), Light())
         
-        t1 = Transform(position=(-8, 0, 0), scale=(1, 1, 5))
-        t2 = Transform(position=(8, 0, 0), scale=(1, 1, 5))
-        paddle1 = CubePrimitive(transform=t1, color=Color.red)
+        paddle1 = Paddle(pos=(-8, 0, 0))
         paddle1.addcomponent(WSMovement())
-        paddle2 = CubePrimitive(transform=t2, color=Color.red)
+        paddle2 = Paddle(pos=(8, 0, 0))
         paddle2.addcomponent(ArrowMovement())
         
-        t3 = Transform(position=(0, 0, 10), scale=(30, 1, 1))
-        t4 = Transform(position=(0, 0, -10), scale=(30, 1, 1))
-        limit1 = CubePrimitive(transform=t3, color=Color.black, density=10000)
-        limit2 = CubePrimitive(transform=t4, color=Color.black, density=10000)
-        ball = SpherePrimitive(Transform((0, 0, -5)), Color.white)
-        ball.addcomponent(BallMovement())
+        limit1 = Limit(pos=(0, 0, 10))
+        limit2 = Limit(pos=(0, 0, -10))
         
-        paddle1.tag = paddle2.tag = 'Player'
-        limit1.tag = limit2.tag = 'Limit'
+        rigidbody = Rigidbody(1)
+        rigidbody.usegravity = False
+        ball = GameObject(Transform((0, 0, -5)), Sphere(), Cube(Color.white), rigidbody)
+        ball.addcomponents(BallMovement(), Camera((0, 0, 30)))
         ball.tag = 'Ball'
         
-        self.scene.addgameobjects(cameraobj, lightobj1, paddle1, paddle2, ball, limit1, limit2)
+        self.scene.addgameobjects(lightobj, paddle1, paddle2, ball, limit1, limit2)
 
         
 if __name__ == "__main__":

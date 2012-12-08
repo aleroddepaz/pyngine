@@ -53,58 +53,76 @@ class Renderer(Component):
         glColor(*self.color)
         glCallList(self.gl_list)
         glPopMatrix()
-    def calculatenormal(self, p1, p2, p3):
-        v1 = (p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2])
-        v2 = (p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2])
-        vx = (v1[1] * v2[2]) - (v1[2] * v2[1])
-        vy = (v1[2] * v2[0]) - (v1[0] * v2[2])
-        vz = (v1[0] * v2[1]) - (v1[1] * v2[0])
-        return (vx, vy, vz)
+
+
+class Sphere(Renderer):
+    slices = 18
+    stacks = 18
+    def __init__(self, color=(0, 0, 0, 1)):
+        Renderer.__init__(self, color)
+        glNewList(self.gl_list, GL_COMPILE)
+        glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
+        glEndList()
+
+
+class Cube(Renderer):
+    def __init__(self, color=(0, 0, 0, 1)):
+        Renderer.__init__(self, color)
+        glNewList(self.gl_list, GL_COMPILE)
+        glutSolidCube(1)
+        glEndList()
 
 
 class Rigidbody(Component):
     def __init__(self, density):
         Component.__init__(self)
         self.density = density
+        self._body = PhysicsEngine.createbody()
     def start(self):
-        body = self.transform._body
-        body.enable()
         mass = PhysicsEngine.createmass()
         mass.setBox(self.density, *self.transform.scale)
-        body.setMass(mass)
+        self._body.setMass(mass)
+        self._body.setPosition(self.transform.position)
+        self._body.setRotation(self.transform.rotation)
+        self.transform._setbody(self._body)
+        if self.collider is not None:
+            self.collider._setbody(self._body)
     def addforce(self, force):
-        self.transform._body.addForce(force)
+        self._body.addForce(force)
     def isenabled(self):
-        return self.transform._body.isEnabled() == 1
+        return self._body.isEnabled() == 1
     @property
     def usegravity(self):
-        return self.transform._body.getGravityMode()
+        return self._body.getGravityMode()
     @usegravity.setter
     def usegravity(self, value):
-        self.transform._body.setGravityMode(value)
+        self._body.setGravityMode(value)
     @property
     def velocity(self):
-        return self.transform._body.getLinearVel()
+        return self._body.getLinearVel()
     @velocity.setter
     def velocity(self, value):
-        self.transform._body.setLinearVel(value)
+        self._body.setLinearVel(value)
 
 
 class Collider(Component):
     def __init__(self):
         Component.__init__(self)
-        self.geom = None
+        self._geom = None
     def _latestart(self):
-        self.geom.gameobject = self.gameobject
-        self.geom.setBody(self.transform._body)
-        self.geom.getBody().disable()
+        self._geom.gameobject = self.gameobject
+    def _setbody(self, body):
+        self._geom.setBody(body)
+    def _clearbody(self):
+        self._geom.setBody(None)
 
 
 class BoxCollider(Collider):
     def __init__(self):
         Collider.__init__(self)
     def start(self):
-        self.geom = PhysicsEngine.creategeom("Box", (self.transform.scale,))
+        scale = self.transform.scale
+        self._geom = PhysicsEngine.creategeom("Box", (scale,))
         self._latestart()
 
 
@@ -113,46 +131,62 @@ class SphereCollider(Collider):
         Collider.__init__(self)
     def start(self):
         radius = self.transform.scale[0]/2.
-        self.geom = PhysicsEngine.creategeom("Sphere", (radius,))
+        self._geom = PhysicsEngine.creategeom("Sphere", (radius,))
         self._latestart()
 
 
 class Transform(Component):
+    
     def __init__(self, position=(0, 0, 0), rotation=(0,)*9, scale=(1, 1, 1)):
         Component.__init__(self)
-        self._body = PhysicsEngine.createbody()
-        self._body.disable()
-        self.position = position
-        self.rotation = rotation
-        self.scale = scale
-    def start(self):
-        Component.start(self)
+        self.__position = position
+        self.__rotation = rotation
+        self.__scale = scale
+        self.__body = None
+    
+    def _setbody(self, body):
+        self.__body = body
+        
+    def _clearbody(self):
+        self.__body = None
+        
     @property
     def position(self):
-        return self._body.getPosition()
+        if self.__body is not None:
+            return self.__body.getPosition()
+        return self.__position
+    
     @position.setter
     def position(self, value):
-        self._body.setPosition(value)
+        if self.__body is not None:
+            self._body.setPosition(value)
+        self.__position = value
+    
     @property
     def rotation(self):
-        return self._body.getRotation()
+        if self.__body is not None:
+            return self.__body.getRotation()
+        return self.__rotation
+    
     @rotation.setter
     def rotation(self, value):
-        self._body.setRotation(value)
+        if self.__body is not None:
+            self._body.setRotation(value)
+        self.__rotation = value
+
     @property
     def scale(self):
-        return self._scale
+        return self.__scale
+    
     @scale.setter
     def scale(self, value):
-        self._scale = value
+        self.__scale = value
+
     def move(self, movement):
-        self.position = map(sum, zip(self.position, movement))
+        self.position = tuple(map(sum, zip(self.position, movement)))
+
     def rotate(self, rotation):
-        self.rotation = map(sum, zip(self.rotation, rotation))
-    def rotatearound(self, other):
-        pass  # TO DO
-    def lookat(self, other):
-        pass  # TO DO
+        self.rotation = tuple(map(sum, zip(self.rotation, rotation)))
 
 
 class Camera(Component):
@@ -190,46 +224,31 @@ class Light(Component):
     def __init__(self, ambient=(0, 0, 0, 1), diffuse=(1, 1, 1, 1),
                  specular=(1, 1, 1, 1), spot_direction=(0, 0, 1)):
         Component.__init__(self)
-        self.gl_light = Light.__getnextlight()
+        self.gl_light = Light._getnextlight()
         self.ambient = ambient
         self.diffuse = diffuse
         self.specular = specular
-        self.spot_direction = spot_direction
+        self.spot_direction = spot_direction + (0,)
         self.directional = False
     def enable(self):
-        if self.gl_light != None:
+        if self.gl_light is not None:
+            gl_light = self.gl_light
             x, y, z = self.transform.position
-            glLightfv(self.gl_light, GL_AMBIENT, self.ambient)
-            glLightfv(self.gl_light, GL_DIFFUSE, self.diffuse)
-            glLightfv(self.gl_light, GL_SPECULAR, self.specular)
-            glLightfv(self.gl_light, GL_SPOT_DIRECTION, self.spot_direction + (0,))
-            glLightfv(self.gl_light, GL_POSITION, (x, y, -z, int(not self.directional)))
-            glEnable(self.gl_light)
+            glposition = (x, y, -z, int(not self.directional))
+            glLightfv(gl_light, GL_AMBIENT, self.ambient)
+            glLightfv(gl_light, GL_DIFFUSE, self.diffuse)
+            glLightfv(gl_light, GL_SPECULAR, self.specular)
+            glLightfv(gl_light, GL_SPOT_DIRECTION, self.spot_direction)
+            glLightfv(gl_light, GL_POSITION, glposition)
+            glEnable(gl_light)
     def disable(self):
-        if self.gl_light != None:
+        if self.gl_light is not None:
             glDisable(self.gl_light)
     @classmethod
-    def __getnextlight(cls):
+    def _getnextlight(cls):
         try: return cls._gllights.pop()
         except IndexError: return None
 
-
-class Sphere(Renderer):
-    slices = 18
-    stacks = 18
-    def __init__(self, color=(0, 0, 0, 1)):
-        Renderer.__init__(self, color)
-        glNewList(self.gl_list, GL_COMPILE)
-        glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
-        glEndList()
-
-
-class Cube(Renderer):
-    def __init__(self, color=(0, 0, 0, 1)):
-        Renderer.__init__(self, color)
-        glNewList(self.gl_list, GL_COMPILE)
-        glutSolidCube(1)
-        glEndList()
 
 
 # ==============================
@@ -266,27 +285,27 @@ class GameObject(object):
     def addcomponent(self, component):
         if isinstance(component, Camera):
             GameObject._camera = component
-        self.__updatecomponents('append', component)
-        self.__checkfield('transform', component)
-        self.__checkfield('rigidbody', component)
-        self.__checkfield('collider', component)
+        self._updatecomponents('append', component)
+        self._checkfield('transform', component)
+        self._checkfield('rigidbody', component)
+        self._checkfield('collider', component)
         component.gameobject = self
         component.start()
         
     def removecomponent(self, component):
-        if component == None: return
+        if component is None: return
         if isinstance(component, Camera):
             GameObject._camera = None
-        self.__updatecomponents('remove', component)
+        self._updatecomponents('remove', component)
         Component.__init__(component)
 
-    def __checkfield(self, clsstring, component): # Use with caution!
+    def _checkfield(self, clsstring, component): # Use with caution!
         if isinstance(component, eval(clsstring.capitalize())):
             oldcomponent = self.__dict__[clsstring]
             self.__dict__[clsstring] = component
             self.removecomponent(oldcomponent)
             
-    def __updatecomponents(self, action, component):
+    def _updatecomponents(self, action, component):
         if isinstance(component, Light):
             getattr(GameObject._lights, action)(component)
         if isinstance(component, Component):
@@ -297,7 +316,7 @@ class GameObject(object):
     def handlemessage(self, string, data=None):
         for component in self.components:
             result = component.handlemessage(string, data)
-            if result != None: return result
+            if result is not None: return result
 
     def update(self):
         for component in self.components: component.update()
@@ -331,12 +350,14 @@ class GameObject(object):
 
 class CubePrimitive(GameObject):
     def __init__(self, transform, color, density=10):
-        GameObject.__init__(self, transform, Rigidbody(density), Cube(color), BoxCollider())
+        GameObject.__init__(self, transform, Rigidbody(density),
+                            Cube(color), BoxCollider())
 
 
 class SpherePrimitive(GameObject):
     def __init__(self, transform, color, density=10):
-        GameObject.__init__(self, transform, Rigidbody(density), Sphere(color), SphereCollider())
+        GameObject.__init__(self, transform, Rigidbody(density),
+                            Sphere(color), SphereCollider())
 
 
 
@@ -430,7 +451,8 @@ class RenderCore(object):
     def setperspective(cls):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(cls._viewangle, cls._aspect, cls._closeview, cls._farview)
+        gluPerspective(cls._viewangle, cls._aspect,
+                       cls._closeview, cls._farview)
     @classmethod
     def dostuff(cls):
         glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
@@ -466,7 +488,9 @@ class Scene(GameObject):
 
 
 class Game(object):
-    def __init__(self, screensize=(800, 600), title="Pyngine game", hwsurface=False):
+    
+    def __init__(self, screensize=(800, 600),
+                 title="Pyngine game", hwsurface=False):
         self.screensize = screensize
         self.title = title
         self.camera = None
@@ -477,6 +501,7 @@ class Game(object):
         RenderCore.setwindowicon(['..', '..', 'icon.png'])
         RenderCore.dostuff()
         RenderCore.enable()
+        
     def mainloop(self, fps=60):
         try:
             self._mainloop(fps)
@@ -484,6 +509,7 @@ class Game(object):
             print "Oops! %s: %s" % (e.errno, e.strerror)
         finally:
             RenderCore.quit()
+            
     def _mainloop(self, fps):
         step = 1. / fps
         clock = pygame.time.Clock()
@@ -494,12 +520,12 @@ class Game(object):
             PhysicsEngine.collide()
             PhysicsEngine.step(step)
             clock.tick(fps)
+            
     def _renderloop(self):
         RenderCore.setviewport()
         RenderCore.setperspective()
         RenderCore.initmodelviewmatrix()
         RenderCore.clearscreen()
-        
         if GameObject._camera: GameObject._camera.push()
         for light in GameObject._lights: light.enable()
         self.scene.render()

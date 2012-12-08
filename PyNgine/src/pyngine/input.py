@@ -1,10 +1,13 @@
 import pygame
 
 
+
 class Input(object):
+    
     quitflag = False
     keys = {}
-    mousevisibility = True
+    mouse_visibility = True
+    
     @classmethod
     def update(cls):
         for event in pygame.event.get():
@@ -14,6 +17,7 @@ class Input(object):
                 cls.keys[event.key] = False
             if event.type == pygame.KEYDOWN:
                 cls.keys[event.key] = True
+                
     @classmethod
     def getkey(cls, key):
         try:
@@ -21,16 +25,20 @@ class Input(object):
         except KeyError:
             cls.keys[key] = False
             return False
+        
     @classmethod
     def getmouseposition(cls):
         return pygame.mouse.get_pos()
+    
     @classmethod
     def getmousebutton(cls, index):
         return pygame.mouse.get_pressed()[index]
+    
     @classmethod
     def getmousevisibility(cls):
-        return cls.mousevisibility
+        return cls.mouse_visibility
+    
     @classmethod
     def setmousevisibility(cls, boolean):
-        cls.mousevisibility = boolean
+        cls.mouse_visibility = boolean
         pygame.mouse.set_visible(boolean)
