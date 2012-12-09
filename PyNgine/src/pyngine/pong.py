@@ -19,11 +19,9 @@ class ArrowMovement(KeyboardMovement):
     def __init__(self):
         KeyboardMovement.__init__(self, K_UP, K_DOWN)
 
-
 class WSMovement(KeyboardMovement):
     def __init__(self):
         KeyboardMovement.__init__(self, K_w, K_s)
-
 
 class BallMovement(Component):
     def start(self):
@@ -36,13 +34,11 @@ class BallMovement(Component):
         elif other.tag == 'Limit': z *= -1.01
         self.movement = (x, 0, z)
 
-
 class Paddle(GameObject):
     def __init__(self, pos, movement):
         GameObject.__init__(self, Transform(position=pos, scale=(1, 1, 5)),
                             BoxCollider(), Cube(Color.blue), movement)
         self.tag = 'Player'
-
 
 class Limit(GameObject):
     def __init__(self, pos):
@@ -50,17 +46,15 @@ class Limit(GameObject):
                             BoxCollider(), Cube(Color.green))
         self.tag = 'Limit'
 
-
 class Ball(GameObject):
     def __init__(self, pos):
         GameObject.__init__(self, Transform(position=pos), SphereCollider(),
                             Sphere(color=Color.white), BallMovement())
 
-
 class Pong(Game):
     def __init__(self):
         Game.__init__(self)
-        cameraobj = GameObject(Transform(), Camera((0, 4, 30), (-15, 0, 0)))
+        cameraobj = GameObject(Transform(), Camera((0, 0, 40), (-45, 0, 0)))
         lightobj = GameObject(Transform((0, 7, 0)), Light())
         paddle1 = Paddle(pos=(-8, 0, 0), movement=WSMovement())
         paddle2 = Paddle(pos=(8, 0, 0), movement=ArrowMovement())
@@ -69,7 +63,7 @@ class Pong(Game):
         ball = Ball(pos=(0, 0, -5))
         self.scene.addgameobjects(cameraobj, lightobj, paddle1, paddle2, ball, limit1, limit2)
 
-        
+
 if __name__ == "__main__":
     game = Pong()
     game.mainloop()
