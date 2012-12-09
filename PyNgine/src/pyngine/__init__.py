@@ -1,8 +1,8 @@
-import os
 import pygame
 from OpenGL.GL import * # @UnusedWildImport
 from OpenGL.GLU import * # @UnusedWildImport
-from OpenGL.raw.GLUT import glutSolidCube, glutSolidSphere
+from OpenGL.raw.GLUT import * # @UnusedWildImport
+from openglrenderer import *
 from physics import PhysicsEngine
 from input import Input
 
@@ -13,23 +13,31 @@ from input import Input
 # ==============================
 
 class Component(object):
+    
     def __init__(self):
         self.gameobject = None
+
     @property
     def transform(self):
         return self.gameobject.transform
+    
     @property
     def rigidbody(self):
         return self.gameobject.rigidbody
+    
     @property
     def collider(self):
         return self.gameobject.collider
+    
     def start(self):
         pass
+    
     def update(self):
         pass
+    
     def oncollision(self, other):
         pass
+    
     def handlemessage(self, string, data):
         pass
 
@@ -50,9 +58,19 @@ class Renderer(Component):
         glMultMatrixd(rot)
         if self.transform.scale != (1, 1, 1):
             glScalef(*self.transform.scale)
-        glColor(*self.color)
+        if self.color is not None:
+            glColor(*self.color)
         glCallList(self.gl_list)
         glPopMatrix()
+
+
+class Cube(Renderer):
+    
+    def __init__(self, color=(0, 0, 0, 1)):
+        Renderer.__init__(self, color)
+        glNewList(self.gl_list, GL_COMPILE)
+        glutSolidCube(1)
+        glEndList()
 
 
 class Sphere(Renderer):
@@ -65,11 +83,116 @@ class Sphere(Renderer):
         glEndList()
 
 
-class Cube(Renderer):
-    def __init__(self, color=(0, 0, 0, 1)):
+class Torus(Renderer):
+    slices = 15
+    rings = 15
+    def __init__(self, inner=1, outer=1, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
-        glutSolidCube(1)
+        f = inner+outer*2.
+        glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
+        glEndList()
+
+
+class Mesh(Renderer):
+    
+    mesh_folder = 'data'
+    
+    def _load_texture_referred(self, mtl, values):
+        mtl[values[0]] = values[1]
+        surf = pygame.image.load(mtl['map_Kd'])
+        image = pygame.image.tostring(surf, 'RGBA', 1)
+        ix, iy = surf.get_rect().size
+        texid = mtl['texture_Kd'] = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texid)
+        glTexParameteri(GL_TEXTURE_2D,
+                        GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D,
+                        GL_TEXTURE_MAG_FILTER,
+                        GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     ix, iy, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, image)
+
+    def _mtl(self, filename):
+        filename = os.sep.join([Mesh.mesh_folder, filename])
+        contents = {}
+        mtl = None
+        for line in open(filename, 'r'):
+            if line.startswith('#'): continue
+            values = line.split()
+            if not values: continue
+            if values[0] == 'newmtl':
+                mtl = contents[values[1]] = {}
+            elif mtl is None:
+                raise ValueError, "mtl file doesn't start with newmtl stmt"
+            elif values[0] == 'map_Kd':
+                self._load_texture_referred(mtl, values)
+            else:
+                mtl[values[0]] = map(float, values[1:])
+        return contents
+
+    def __init__(self, filename):
+        Renderer.__init__(self, (0,0,0,1))
+        filename = os.sep.join([Mesh.mesh_folder, filename])
+        self.vertices = []
+        self.normals = []
+        self.texcoords = []
+        self.faces = []
+        material = None
+        for line in open(filename, 'r'):
+            if line.startswith('#'): continue
+            values = line.split()
+            if not values:
+                continue
+            elif values[0] == 'v':
+                v = map(float, values[1:4])
+                self.vertices.append(v)
+            elif values[0] == 'vn':
+                v = map(float, values[1:4])
+                self.normals.append(v)
+            elif values[0] == 'vt':
+                self.texcoords.append(map(float, values[1:3]))
+            elif values[0] in ('usemtl', 'usemat'):
+                material = values[1]
+            elif values[0] == 'mtllib':
+                self.mtl = self._mtl(values[1])
+            elif values[0] == 'f':
+                face = []
+                texcoords = []
+                norms = []
+                for v in values[1:]:
+                    w = v.split('/')
+                    face.append(int(w[0]))
+                    if len(w) >= 2 and len(w[1]) > 0:
+                        texcoords.append(int(w[1]))
+                    else:
+                        texcoords.append(0)
+                    if len(w) >= 3 and len(w[2]) > 0:
+                        norms.append(int(w[2]))
+                    else:
+                        norms.append(0)
+                self.faces.append((face, norms, texcoords, material))
+        glNewList(self.gl_list, GL_COMPILE)
+        glEnable(GL_TEXTURE_2D)
+        glFrontFace(GL_CCW)
+        for face in self.faces:
+            vertices, normals, texture_coords, material = face
+            mtl = self.mtl[material]
+            if 'texture_Kd' in mtl:
+                glBindTexture(GL_TEXTURE_2D, mtl['texture_Kd']) # use diffuse texmap
+            else:
+                glColor(*mtl['Kd']) # just use diffuse colour
+            glBegin(GL_POLYGON)
+            for i, vertex in enumerate(vertices):
+                if normals[i] > 0:
+                    glNormal3fv(self.normals[normals[i] - 1])
+                if texture_coords[i] > 0:
+                    glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
+                glVertex3fv(self.vertices[vertex - 1])
+            glEnd()
+        glDisable(GL_TEXTURE_2D)
         glEndList()
 
 
@@ -137,50 +260,51 @@ class SphereCollider(Collider):
 
 class Transform(Component):
     
-    def __init__(self, position=(0, 0, 0), rotation=(0,)*9, scale=(1, 1, 1)):
+    def __init__(self, position=(0, 0, 0),
+                 rotation=(1, 0, 0, 0, 1, 0, 0, 0, 1), scale=(1, 1, 1)):
         Component.__init__(self)
-        self.__position = position
-        self.__rotation = rotation
-        self.__scale = scale
-        self.__body = None
+        self._position = position
+        self._rotation = rotation
+        self._scale = scale
+        self._body = None
     
     def _setbody(self, body):
-        self.__body = body
+        self._body = body
         
     def _clearbody(self):
-        self.__body = None
+        self._body = None
         
     @property
     def position(self):
-        if self.__body is not None:
-            return self.__body.getPosition()
-        return self.__position
+        if self._body is not None:
+            return self._body.getPosition()
+        return self._position
     
     @position.setter
     def position(self, value):
-        if self.__body is not None:
+        if self._body is not None:
             self._body.setPosition(value)
-        self.__position = value
+        self._position = value
     
     @property
     def rotation(self):
-        if self.__body is not None:
-            return self.__body.getRotation()
-        return self.__rotation
+        if self._body is not None:
+            return self._body.getRotation()
+        return self._rotation
     
     @rotation.setter
     def rotation(self, value):
-        if self.__body is not None:
+        if self._body is not None:
             self._body.setRotation(value)
-        self.__rotation = value
+        self._rotation = value
 
     @property
     def scale(self):
-        return self.__scale
+        return self._scale
     
     @scale.setter
     def scale(self, value):
-        self.__scale = value
+        self._scale = value
 
     def move(self, movement):
         self.position = tuple(map(sum, zip(self.position, movement)))
@@ -190,28 +314,32 @@ class Transform(Component):
 
 
 class Camera(Component):
+    
     def __init__(self, distance=(0, 0, 0), orientation=(0, 0, 0)):
         Component.__init__(self)
         self.distance = distance
         self.orientation = orientation
+        
     def push(self):
         dx, dy, dz = self.distance
         x, y, z = self.transform.position
         a, b, c = self.orientation
-        
         glPushMatrix()
         glTranslatef(-dx, -dy, -dz)
         glRotatef(-a, 1, 0, 0)
         glRotatef(-b, 0, 1, 0)
         glRotatef(c, 0, 0, 1)
         glTranslatef(-x, -y, z)
+
     def pop(self):
         glPopMatrix()
+
     def set_facing_matrix(self):
         a, b, c = self.orientation
         glRotatef(-a, 0, 0, 1)
         glRotatef(b, 0, 1, 0)
         glRotatef(c, 1, 0, 0)
+
     def set_skybox_data(self):
         a, b, c = self.orientation
         glRotatef(-a, 1, 0, 0)
@@ -220,35 +348,29 @@ class Camera(Component):
 
 
 class Light(Component):
-    _gllights = range(GL_LIGHT0, GL_LIGHT7 + 1) # Max 8 lights
+    
     def __init__(self, ambient=(0, 0, 0, 1), diffuse=(1, 1, 1, 1),
                  specular=(1, 1, 1, 1), spot_direction=(0, 0, 1)):
         Component.__init__(self)
-        self.gl_light = Light._getnextlight()
+        self.gl_light = OpenGLRenderer.getnextlight()
         self.ambient = ambient
         self.diffuse = diffuse
         self.specular = specular
         self.spot_direction = spot_direction + (0,)
         self.directional = False
+        
     def enable(self):
         if self.gl_light is not None:
-            gl_light = self.gl_light
             x, y, z = self.transform.position
-            glposition = (x, y, -z, int(not self.directional))
-            glLightfv(gl_light, GL_AMBIENT, self.ambient)
-            glLightfv(gl_light, GL_DIFFUSE, self.diffuse)
-            glLightfv(gl_light, GL_SPECULAR, self.specular)
-            glLightfv(gl_light, GL_SPOT_DIRECTION, self.spot_direction)
-            glLightfv(gl_light, GL_POSITION, glposition)
-            glEnable(gl_light)
+            gl_position = (x, y, -z, int(not self.directional))
+            OpenGLRenderer.enablelight(self.gl_light, self.ambient,
+                                       self.diffuse, self.specular,
+                                       self.spot_direction, gl_position)
+            
     def disable(self):
         if self.gl_light is not None:
-            glDisable(self.gl_light)
-    @classmethod
-    def _getnextlight(cls):
-        try: return cls._gllights.pop()
-        except IndexError: return None
-
+            OpenGLRenderer.disable(self.gl_light)
+            
 
 
 # ==============================
@@ -396,89 +518,10 @@ class Color(object):
         return self.__color
 
 
-
 # ==============================
 # Game
 # ==============================
 
-class RenderCore(object):
-    _screenwidth = None
-    _screenheight = None
-    _aspect = 0
-    _viewangle = 45
-    _closeview = 0.1
-    _farview = 100.0
-    @classmethod
-    def init(cls, screensize, hwsurface):
-        cls._screenwidth = screensize[0]
-        cls._screenheight = screensize[1]
-        cls._aspect = 1. * screensize[0] / screensize[1]
-        pygame.init()
-        params = pygame.OPENGL | pygame.DOUBLEBUF
-        if hwsurface:
-            params |= pygame.HWSURFACE
-        pygame.display.set_mode(screensize, params)
-    @classmethod
-    def setwindowtitle(cls, title):
-        pygame.display.set_caption(title)
-    @classmethod
-    def setwindowicon(cls, path):
-        comppath = os.path.join(*path)
-        icon = pygame.image.load(comppath).convert_alpha()
-        pygame.display.set_icon(icon)
-    @classmethod
-    def initmodelviewmatrix(cls):
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
-    @classmethod
-    def clearscreen(cls):
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
-    @classmethod
-    def enable(cls):
-        glEnable(GL_FOG)
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_COLOR_MATERIAL)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_NORMALIZE)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        glEnable(GL_SCISSOR_TEST)
-        glEnable(GL_CULL_FACE)
-    @classmethod
-    def setviewport(cls):
-        glViewport(0, 0, cls._screenwidth, cls._screenheight)
-    @classmethod
-    def setperspective(cls):
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        gluPerspective(cls._viewangle, cls._aspect,
-                       cls._closeview, cls._farview)
-    @classmethod
-    def dostuff(cls):
-        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
-        glShadeModel(GL_SMOOTH)
-        glDepthFunc(GL_LEQUAL)
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glPointSize(10)
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
-        glFogfv(GL_FOG_COLOR, (.5, .5, .5, 1))
-        glFogi(GL_FOG_MODE, GL_LINEAR)
-        glFogf(GL_FOG_DENSITY, .35)
-        glHint(GL_FOG_HINT, GL_NICEST)
-        glFogf(GL_FOG_START, 10.0)
-        glFogf(GL_FOG_END, 125.0)
-        glAlphaFunc(GL_GEQUAL, .5)
-        glClearColor(*Color.gray)
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-        glFrontFace(GL_CCW)
-        glCullFace(GL_BACK)
-    @classmethod
-    def flip(cls):
-        pygame.display.flip()
-    @classmethod
-    def quit(cls):
-        pygame.quit()
 
 
 class Scene(GameObject):
@@ -496,11 +539,11 @@ class Game(object):
         self.camera = None
         self.lights = []
         self.scene = Scene()
-        RenderCore.init(screensize, hwsurface)
-        RenderCore.setwindowtitle(title)
-        RenderCore.setwindowicon(['..', '..', 'icon.png'])
-        RenderCore.dostuff()
-        RenderCore.enable()
+        OpenGLRenderer.init(screensize, hwsurface)
+        OpenGLRenderer.setwindowtitle(title)
+        OpenGLRenderer.setwindowicon(['..', '..', 'icon.png'])
+        OpenGLRenderer.dostuff()
+        OpenGLRenderer.enable()
         
     def mainloop(self, fps=60):
         try:
@@ -508,7 +551,7 @@ class Game(object):
         except Error as e:
             print "Oops! %s: %s" % (e.errno, e.strerror)
         finally:
-            RenderCore.quit()
+            OpenGLRenderer.quit()
             
     def _mainloop(self, fps):
         step = 1. / fps
@@ -522,12 +565,12 @@ class Game(object):
             clock.tick(fps)
             
     def _renderloop(self):
-        RenderCore.setviewport()
-        RenderCore.setperspective()
-        RenderCore.initmodelviewmatrix()
-        RenderCore.clearscreen()
+        OpenGLRenderer.setviewport()
+        OpenGLRenderer.setperspective()
+        OpenGLRenderer.initmodelviewmatrix()
+        OpenGLRenderer.clearscreen()
         if GameObject._camera: GameObject._camera.push()
         for light in GameObject._lights: light.enable()
         self.scene.render()
         if GameObject._camera: GameObject._camera.pop()
-        RenderCore.flip()
+        OpenGLRenderer.flip()

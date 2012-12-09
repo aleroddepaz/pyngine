@@ -9,8 +9,12 @@ class Jump(Component):
     def update(self):
         body = self.gameobject.rigidbody
         x, y, z = body.velocity
-        if Input.getkey(pygame.K_a): body.velocity = (x-self.speed,y,z)
-        if Input.getkey(pygame.K_d): body.velocity = (x+self.speed,y,z)
+        if Input.getkey(pygame.K_a):
+            if x > 0: x/10.
+            body.velocity = (x-self.speed,y,z)
+        if Input.getkey(pygame.K_d):
+            if x < 0: x/10.
+            body.velocity = (x+self.speed,y,z)
         if Input.getkey(pygame.K_w) and self.canjump:
             self.canjump = False
             body.addforce((0,self.jumpforce,0))
@@ -32,12 +36,14 @@ class Platformer(Game):
         light.addcomponent(Light())
         
         platform1 = Platform(pos=(0, 1 ,0), size=(10, 1, 2))
-        platform2 = Platform(pos=(12, 3, 0), size=(10, 1, 2))
-        platform3 = Platform(pos=(-12, 3, 0), size=(10, 1, 2))
+        platform2 = Platform(pos=(11.5, 2, 0), size=(10, 1, 2))
+        platform3 = Platform(pos=(-12, 4, 0), size=(10, 1, 2))
+
+        woman = GameObject(Transform((8, 3, 0), scale=(.5,.5,.5)), Mesh('woman.obj'))
 
         sphere = GameObject(Transform((0, 7, 0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
         sphere.addcomponents(Camera((0, 0, 20)), Jump())
-        self.scene.addgameobjects(light,platform1, platform2, platform3, sphere)
+        self.scene.addgameobjects(light, platform1, platform2, platform3, sphere, woman)
 
 if __name__ == "__main__":
     p = Platformer()
