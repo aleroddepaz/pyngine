@@ -3,9 +3,7 @@ import ode
 
 
 class PhysicsEngineError(Exception):
-    """
-    Class for errors in PhysicsEngine methods
-    """
+    """ Class for errors in PhysicsEngine methods """
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
@@ -27,12 +25,9 @@ class PhysicsEngine(object):
         
     @classmethod
     def step(cls, step):
+        cls.space.collide(None, cls._collidecallback)
         cls.world.step(step)
         cls.contactgroup.empty()
-        
-    @classmethod
-    def collide(cls):
-        cls.space.collide(None, cls._collidecallback)
         
     @classmethod
     def _collidecallback(cls, args, geom1, geom2):

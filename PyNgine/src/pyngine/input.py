@@ -42,3 +42,21 @@ class Input(object):
     def setmousevisibility(cls, boolean):
         cls.mouse_visibility = boolean
         pygame.mouse.set_visible(boolean)
+    
+    @classmethod
+    def gethorizontalaxis(cls):
+        if Input.getkey(pygame.K_a) or Input.getkey(pygame.K_LEFT):
+            return -1
+        elif Input.getkey(pygame.K_d) or Input.getkey(pygame.K_RIGHT):
+            return 1
+        else:
+            return 0
+    
+    @classmethod
+    def getverticalaxis(cls):
+        if Input.getkey(pygame.K_s) or Input.getkey(pygame.K_DOWN):
+            return -1
+        elif Input.getkey(pygame.K_w) or Input.getkey(pygame.K_UP):
+            return 1
+        else:
+            return 0

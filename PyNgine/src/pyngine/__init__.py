@@ -43,10 +43,12 @@ class Component(object):
 
 
 class Renderer(Component):
+    
     def __init__(self, color):
         Component.__init__(self)
         self.gl_list = glGenLists(1)
         self.color = color
+        
     def render(self):
         x, y, z = self.transform.position
         R = self.transform.rotation
@@ -74,8 +76,10 @@ class Cube(Renderer):
 
 
 class Sphere(Renderer):
+    
     slices = 18
     stacks = 18
+    
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
@@ -84,8 +88,10 @@ class Sphere(Renderer):
 
 
 class Torus(Renderer):
+    
     slices = 15
     rings = 15
+    
     def __init__(self, inner=1, outer=1, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
@@ -185,9 +191,9 @@ class Mesh(Renderer):
             else:
                 glColor(*mtl['Kd']) # just use diffuse colour
             glBegin(GL_POLYGON)
-            for i, vertex in enumerate(vertices):
-                if normals[i] > 0:
-                    glNormal3fv(self.normals[normals[i] - 1])
+            for i, (vertex, normal) in enumerate(zip(vertices, normals)):
+                if normal > 0:
+                    glNormal3fv(self.normals[normal - 1])
                 if texture_coords[i] > 0:
                     glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
                 glVertex3fv(self.vertices[vertex - 1])
@@ -197,10 +203,12 @@ class Mesh(Renderer):
 
 
 class Rigidbody(Component):
+    
     def __init__(self, density):
         Component.__init__(self)
         self.density = density
         self._body = PhysicsEngine.createbody()
+        
     def start(self):
         mass = PhysicsEngine.createmass()
         mass.setBox(self.density, *self.transform.scale)
@@ -210,52 +218,68 @@ class Rigidbody(Component):
         self.transform._setbody(self._body)
         if self.collider is not None:
             self.collider._setbody(self._body)
+            
     def addforce(self, force):
         self._body.addForce(force)
+        
     def isenabled(self):
         return self._body.isEnabled() == 1
+    
     @property
     def usegravity(self):
         return self._body.getGravityMode()
+    
     @usegravity.setter
     def usegravity(self, value):
         self._body.setGravityMode(value)
+        
     @property
     def velocity(self):
         return self._body.getLinearVel()
+    
     @velocity.setter
     def velocity(self, value):
         self._body.setLinearVel(value)
 
 
 class Collider(Component):
+    
     def __init__(self):
         Component.__init__(self)
         self._geom = None
-    def _latestart(self):
+        
+    def _fixedstart(self):
         self._geom.gameobject = self.gameobject
+        self._geom.setPosition(self.transform.position)
+        self._geom.setRotation(self.transform.rotation)
+        
     def _setbody(self, body):
         self._geom.setBody(body)
+        
     def _clearbody(self):
         self._geom.setBody(None)
 
 
 class BoxCollider(Collider):
+    
     def __init__(self):
         Collider.__init__(self)
+        
     def start(self):
         scale = self.transform.scale
         self._geom = PhysicsEngine.creategeom("Box", (scale,))
-        self._latestart()
+        self._fixedstart()
 
 
 class SphereCollider(Collider):
+    
     def __init__(self):
         Collider.__init__(self)
+        
     def start(self):
         radius = self.transform.scale[0]/2.
         self._geom = PhysicsEngine.creategeom("Sphere", (radius,))
-        self._latestart()
+        self._fixedstart()
 
 
 class Transform(Component):
@@ -560,7 +584,6 @@ class Game(object):
             Input.update()
             self.scene.update()
             self._renderloop()
-            PhysicsEngine.collide()
             PhysicsEngine.step(step)
             clock.tick(fps)
             
