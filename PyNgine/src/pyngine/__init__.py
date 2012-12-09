@@ -252,6 +252,7 @@ class Collider(Component):
         self._geom.gameobject = self.gameobject
         self._geom.setPosition(self.transform.position)
         self._geom.setRotation(self.transform.rotation)
+        self.transform._setgeom(self._geom)
         
     def _setbody(self, body):
         self._geom.setBody(body)
@@ -290,12 +291,31 @@ class Transform(Component):
         self._position = position
         self._rotation = rotation
         self._scale = scale
+        self._geom = None
         self._body = None
     
+    def _setgeom(self, geom):
+        """
+        Adds a reference to the geom of the gameobject's collider
+        """
+        self._geom = geom
+        
+    def _cleargeom(self):
+        """
+        Set the reference to the geom of the gameobject's collider to None
+        """
+        self._geom = None
+    
     def _setbody(self, body):
+        """
+        Adds a reference to the body of the gameobject's rigidbody
+        """
         self._body = body
         
     def _clearbody(self):
+        """
+        Set the reference to the body of the gameobject's rigidbody to None
+        """
         self._body = None
         
     @property
@@ -308,6 +328,8 @@ class Transform(Component):
     def position(self, value):
         if self._body is not None:
             self._body.setPosition(value)
+        if self._geom is not None:
+            self._geom.setPosition(value)
         self._position = value
     
     @property
@@ -331,9 +353,15 @@ class Transform(Component):
         self._scale = value
 
     def move(self, movement):
+        """
+        Moves the transform a certain offset
+        """
         self.position = tuple(map(sum, zip(self.position, movement)))
 
     def rotate(self, rotation):
+        """
+        Rotates the transform a certain offset
+        """
         self.rotation = tuple(map(sum, zip(self.rotation, rotation)))
 
 
