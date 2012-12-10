@@ -40,7 +40,8 @@ class Platformer(Game):
         platform3 = Platform(pos=(-12, 4, 0), size=(10, 1, 5))
         sphere = GameObject(Transform((0, 7, 0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
         sphere.addcomponents(Camera((0, 2, 20)), PlayerMovement())
-        self.scene.addgameobjects(light, platform1, platform2, platform3, sphere)
+        woman = GameObject(Transform((4,4,0), scale=(.5,.5,.5)), Mesh('woman.obj'))
+        self.scene.addgameobjects(light, platform1, platform2, platform3, sphere, woman)
 
 if __name__ == "__main__":
     p = Platformer()

@@ -102,7 +102,7 @@ class Torus(Renderer):
 
 class Mesh(Renderer):
     
-    mesh_folder = 'data'
+    mesh_folder = os.sep.join(['..','data','obj'])
     
     def _load_texture_referred(self, mtl, values):
         mtl[values[0]] = values[1]
