@@ -593,7 +593,7 @@ class Game(object):
         self.scene = Scene()
         OpenGLRenderer.init(screensize, hwsurface)
         OpenGLRenderer.setwindowtitle(title)
-        OpenGLRenderer.setwindowicon(['..', '..', 'icon.png'])
+        OpenGLRenderer.setwindowicon(['..', 'data', 'images', 'icon.png'])
         OpenGLRenderer.dostuff()
         OpenGLRenderer.enable()
         
