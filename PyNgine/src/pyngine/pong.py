@@ -25,9 +25,14 @@ class WSMovement(KeyboardMovement):
 
 class BallMovement(Component):
     def start(self):
+        self.start_position = self.transform.position
         self.movement = (.1, 0, .1)
     def update(self):
         self.transform.move(self.movement)
+        x = self.transform.position[0]
+        if x > 30 or x < -30:
+            self.transform.position = self.start_position
+            self.movement = (.1, 0, .1)
     def oncollision(self, other):
         x, _, z = self.movement
         if other.tag == 'Player': x *= -1.025
