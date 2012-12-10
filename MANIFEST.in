@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include MANIFEST.in
+recursive-include pyngine *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
