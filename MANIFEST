@@ -1,0 +1,8 @@
+LICENSE
+MANIFEST.in
+README.rst
+setup.py
+pyngine\__init__.py
+pyngine\input.py
+pyngine\openglrenderer.py
+pyngine\physics.py

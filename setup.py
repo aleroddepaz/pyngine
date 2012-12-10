@@ -7,6 +7,7 @@ setup(
     license = 'GPLv3',
     description = 'Minimalist 3D game engine',
     author = 'Alejandro Rodas',
+    author_email = 'alexrdp90@gmail.com',
     packages = ['pyngine'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
