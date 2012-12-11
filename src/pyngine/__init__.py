@@ -13,7 +13,7 @@ from input import Input
 # ==============================
 
 class Component(object):
-    
+
     def __init__(self):
         self.gameobject = None
 
@@ -43,7 +43,6 @@ class Component(object):
 
 
 class Renderer(Component):
-    
     def __init__(self, color):
         Component.__init__(self)
         self.gl_list = glGenLists(1)
@@ -67,7 +66,6 @@ class Renderer(Component):
 
 
 class Cube(Renderer):
-    
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
@@ -76,7 +74,6 @@ class Cube(Renderer):
 
 
 class Sphere(Renderer):
-    
     slices = 18
     stacks = 18
     
@@ -88,7 +85,6 @@ class Sphere(Renderer):
 
 
 class Torus(Renderer):
-    
     slices = 15
     rings = 15
     
@@ -101,9 +97,6 @@ class Torus(Renderer):
 
 
 class Mesh(Renderer):
-    
-    mesh_folder = os.sep.join(['..','data','obj'])
-    
     def _load_texture_referred(self, mtl, values):
         mtl[values[0]] = values[1]
         surf = pygame.image.load(mtl['map_Kd'])
@@ -122,7 +115,6 @@ class Mesh(Renderer):
                      GL_UNSIGNED_BYTE, image)
 
     def _mtl(self, filename):
-        filename = os.sep.join([Mesh.mesh_folder, filename])
         contents = {}
         mtl = None
         for line in open(filename, 'r'):

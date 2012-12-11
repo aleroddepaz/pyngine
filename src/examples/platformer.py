@@ -2,7 +2,6 @@ from pyngine import * # @UnusedWildImport
 
 
 class PlayerMovement(Component):
-    
     def start(self):
         self.speed = 5
         self.jumpforce = 200
@@ -23,7 +22,6 @@ class PlayerMovement(Component):
 
 
 class Platform(GameObject):
-    
     def __init__(self, pos, size):
         GameObject.__init__(self, Transform(position=pos, scale=size))
         self.addcomponents(Cube(color=Color.white), BoxCollider())
@@ -38,10 +36,10 @@ class Platformer(Game):
         platform1 = Platform(pos=(0, 0 ,0), size=(20, 1, 20))
         platform2 = Platform(pos=(11.5, 2, 0), size=(10, 1, 5))
         platform3 = Platform(pos=(-12, 4, 0), size=(10, 1, 5))
-        sphere = GameObject(Transform((0, 7, 0)), Sphere(color=Color.green), SphereCollider(), Rigidbody(1))
-        sphere.addcomponents(Camera((0, 2, 20)), PlayerMovement())
-        woman = GameObject(Transform((4,4,0), scale=(.5,.5,.5)), Mesh('woman.obj'))
-        self.scene.addgameobjects(light, platform1, platform2, platform3, sphere, woman)
+        sphere = GameObject(Transform((0, 7, 0)), Sphere(color=Color.green),
+                            SphereCollider(), Rigidbody(1), Camera((0, 2, 20)),
+                            PlayerMovement())
+        self.scene.addgameobjects(light, platform1, platform2, platform3, sphere)
 
 if __name__ == "__main__":
     p = Platformer()

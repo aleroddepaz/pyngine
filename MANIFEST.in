@@ -1,0 +1,7 @@
+include INSTALL.md
+include LICENSE
+include MANIFEST.in
+include README.rst
+include setup.py
+recursive-include examples *
+recursive-include pyngine *

@@ -9,6 +9,8 @@ setup(
     author = 'Alejandro Rodas',
     author_email = 'alexrdp90@gmail.com',
     packages = ['pyngine'],
+    package_dir = {'pyngine': 'src/pyngine'},
+    package_data = {'pyngine': ['data/*']},
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
