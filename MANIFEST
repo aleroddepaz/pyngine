@@ -1,9 +1,11 @@
-LICENSE
-INSTALL.md
-MANIFEST.in
-README.rst
-setup.py
-icon.ico
-pyngine *
-examples *
-tests *
+include LICENSE
+include MANIFEST
+include INSTALL.md
+include README.rst
+include setup.py
+include icon.ico
+recursive-include pyngine *
+recursive-include examples *
+recursive-include tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
