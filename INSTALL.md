@@ -33,3 +33,13 @@ Once you have ODE installed, you can install the Python bindings directly from t
 	$ make
 	$ make install
 	$ apt-get install python-ode-doc python-ode
+
+
+## Installing PyNgine
+
+	$ pip install pyngine
+
+Or if you are installing it directly from source
+
+	$ python setup.py install
+
