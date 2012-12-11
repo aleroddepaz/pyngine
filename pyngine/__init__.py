@@ -584,16 +584,16 @@ class Scene(GameObject):
 
 class Game(object):
     
-    def __init__(self, screensize=(800, 600),
-                 title="Pyngine game", hwsurface=False):
+    def __init__(self, screensize=(800, 600), title="Pyngine game",
+                 hwsurface=False, path_to_icon=None):
         self.screensize = screensize
         self.title = title
         self.camera = None
         self.lights = []
         self.scene = Scene()
         OpenGLRenderer.init(screensize, hwsurface)
-        OpenGLRenderer.setwindowtitle(title)
-        OpenGLRenderer.setwindowicon(['..', 'data', 'images', 'icon.png'])
+        OpenGLRenderer.setwindowtitle(title)        
+        OpenGLRenderer.setwindowicon(path_to_icon)
         OpenGLRenderer.dostuff()
         OpenGLRenderer.enable()
         

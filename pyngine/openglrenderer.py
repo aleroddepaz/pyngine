@@ -29,8 +29,10 @@ class OpenGLRenderer(object):
         
     @classmethod
     def setwindowicon(cls, path):
-        comppath = os.path.join(*path)
-        icon = pygame.image.load(comppath).convert_alpha()
+        if path is None:
+            abspath = os.path.split(os.path.abspath(__file__))
+            path = os.sep.join([abspath[0], '..', 'icon.ico'])
+        icon = pygame.image.load(path).convert_alpha()
         pygame.display.set_icon(icon)
         
     @classmethod
