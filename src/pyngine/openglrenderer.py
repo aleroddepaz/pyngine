@@ -3,7 +3,7 @@ import pygame
 from OpenGL.GL import * # @UnusedWildImport
 from OpenGL.GLU import * # @UnusedWildImport
 
-
+#TODO: Document class
 class OpenGLRenderer(object):
     _screenwidth = None
     _screenheight = None
@@ -31,7 +31,7 @@ class OpenGLRenderer(object):
     def setwindowicon(cls, path):
         if path is None:
             abspath = os.path.split(os.path.abspath(__file__))
-            path = os.sep.join([abspath[0], 'data', 'icon.ico'])
+            path = os.path.join(abspath[0], 'data', 'icon.ico')
         icon = pygame.image.load(path).convert_alpha()
         pygame.display.set_icon(icon)
         

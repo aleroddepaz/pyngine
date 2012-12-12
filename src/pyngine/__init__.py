@@ -1,7 +1,5 @@
 import pygame
-from OpenGL.GL import * # @UnusedWildImport
-from OpenGL.GLU import * # @UnusedWildImport
-from OpenGL.raw.GLUT import * # @UnusedWildImport
+import OpenGL.GLUT as GLUT
 from openglrenderer import *
 from physics import PhysicsEngine
 from input import Input
@@ -69,7 +67,7 @@ class Cube(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
-        glutSolidCube(1)
+        GLUT.glutSolidCube(1)
         glEndList()
 
 
@@ -80,7 +78,7 @@ class Sphere(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
-        glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
+        GLUT.glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
         glEndList()
 
 
@@ -92,7 +90,7 @@ class Torus(Renderer):
         Renderer.__init__(self, color)
         glNewList(self.gl_list, GL_COMPILE)
         f = inner+outer*2.
-        glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
+        GLUT.glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
         glEndList()
 
 
@@ -276,7 +274,7 @@ class SphereCollider(Collider):
 
 
 class Transform(Component):
-    
+    #TODO: Fix rotation
     def __init__(self, position=(0, 0, 0),
                  rotation=(1, 0, 0, 0, 1, 0, 0, 0, 1), scale=(1, 1, 1)):
         Component.__init__(self)
@@ -583,6 +581,7 @@ class Game(object):
         self.camera = None
         self.lights = []
         self.scene = Scene()
+        GLUT.glutInit([])
         OpenGLRenderer.init(screensize, hwsurface)
         OpenGLRenderer.setwindowtitle(title)        
         OpenGLRenderer.setwindowicon(path_to_icon)

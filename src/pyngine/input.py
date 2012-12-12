@@ -1,7 +1,7 @@
 import pygame
 
 
-
+#TODO: Document class
 class Input(object):
     
     quitflag = False

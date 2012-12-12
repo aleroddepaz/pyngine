@@ -1,13 +1,12 @@
 import ode
 
 
-
 class PhysicsEngineError(Exception):
     """ Class for errors in PhysicsEngine methods """
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
-
+#TODO: Document class
 class PhysicsEngine(object):
     
     world = ode.World()
