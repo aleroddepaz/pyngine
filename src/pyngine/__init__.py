@@ -1,9 +1,16 @@
+import random
+import math
+import os
+
 import pygame
+import OpenGL.GL as GL
 import OpenGL.GLUT as GLUT
-from openglrenderer import *
+
+from openglrenderer import OpenGLRenderer
 from physics import PhysicsEngine
 from input import Input
 
+VERSION = '0.0.4'
 
 
 # ==============================
@@ -11,7 +18,6 @@ from input import Input
 # ==============================
 
 class Component(object):
-
     def __init__(self):
         self.gameobject = None
 
@@ -43,32 +49,19 @@ class Component(object):
 class Renderer(Component):
     def __init__(self, color):
         Component.__init__(self)
-        self.gl_list = glGenLists(1)
+        self.gl_list = GL.glGenLists(1)
         self.color = color
         
     def render(self):
-        x, y, z = self.transform.position
-        R = self.transform.rotation
-        rot = [R[0], R[3], R[6], 0,
-               R[1], R[4], R[7], 0,
-               R[2], R[5], R[8], 0,
-               x, y, -z, 1]
-        glPushMatrix()
-        glMultMatrixd(rot)
-        if self.transform.scale != (1, 1, 1):
-            glScalef(*self.transform.scale)
-        if self.color is not None:
-            glColor(*self.color)
-        glCallList(self.gl_list)
-        glPopMatrix()
+        OpenGLRenderer.render(self)
 
 
 class Cube(Renderer):
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
-        glNewList(self.gl_list, GL_COMPILE)
+        GL.glNewList(self.gl_list, GL.GL_COMPILE)
         GLUT.glutSolidCube(1)
-        glEndList()
+        GL.glEndList()
 
 
 class Sphere(Renderer):
@@ -77,9 +70,9 @@ class Sphere(Renderer):
     
     def __init__(self, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
-        glNewList(self.gl_list, GL_COMPILE)
+        GL.glNewList(self.gl_list, GL.GL_COMPILE)
         GLUT.glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
-        glEndList()
+        GL.glEndList()
 
 
 class Torus(Renderer):
@@ -88,10 +81,10 @@ class Torus(Renderer):
     
     def __init__(self, inner=1, outer=1, color=(0, 0, 0, 1)):
         Renderer.__init__(self, color)
-        glNewList(self.gl_list, GL_COMPILE)
+        GL.glNewList(self.gl_list, GL.GL_COMPILE)
         f = inner+outer*2.
         GLUT.glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
-        glEndList()
+        GL.glEndList()
 
 
 class Mesh(Renderer):
@@ -100,17 +93,17 @@ class Mesh(Renderer):
         surf = pygame.image.load(mtl['map_Kd'])
         image = pygame.image.tostring(surf, 'RGBA', 1)
         ix, iy = surf.get_rect().size
-        texid = mtl['texture_Kd'] = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texid)
-        glTexParameteri(GL_TEXTURE_2D,
-                        GL_TEXTURE_MIN_FILTER,
-                        GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D,
-                        GL_TEXTURE_MAG_FILTER,
-                        GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     ix, iy, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, image)
+        texid = mtl['texture_Kd'] = GL.glGenTextures(1)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, texid)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,
+                        GL.GL_TEXTURE_MIN_FILTER,
+                        GL.GL_LINEAR)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,
+                        GL.GL_TEXTURE_MAG_FILTER,
+                        GL.GL_LINEAR)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA,
+                     ix, iy, 0, GL.GL_RGBA,
+                     GL.GL_UNSIGNED_BYTE, image)
 
     def _mtl(self, filename):
         contents = {}
@@ -170,30 +163,92 @@ class Mesh(Renderer):
                     else:
                         norms.append(0)
                 self.faces.append((face, norms, texcoords, material))
-        glNewList(self.gl_list, GL_COMPILE)
-        glEnable(GL_TEXTURE_2D)
-        glFrontFace(GL_CCW)
+        GL.glNewList(self.gl_list, GL.GL_COMPILE)
+        GL.glEnable(GL.GL_TEXTURE_2D)
+        GL.glFrontFace(GL.GL_CCW)
         for face in self.faces:
             vertices, normals, texture_coords, material = face
             mtl = self.mtl[material]
             if 'texture_Kd' in mtl:
-                glBindTexture(GL_TEXTURE_2D, mtl['texture_Kd']) # use diffuse texmap
+                GL.glBindTexture(GL.GL_TEXTURE_2D, mtl['texture_Kd']) # use diffuse texmap
             else:
-                glColor(*mtl['Kd']) # just use diffuse colour
-            glBegin(GL_POLYGON)
+                GL.glColor(*mtl['Kd']) # just use diffuse colour
+            GL.glBegin(GL.GL_POLYGON)
             for i, (vertex, normal) in enumerate(zip(vertices, normals)):
                 if normal > 0:
-                    glNormal3fv(self.normals[normal - 1])
+                    GL.glNormal3fv(self.normals[normal - 1])
                 if texture_coords[i] > 0:
-                    glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
-                glVertex3fv(self.vertices[vertex - 1])
-            glEnd()
-        glDisable(GL_TEXTURE_2D)
-        glEndList()
+                    GL.glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
+                GL.glVertex3fv(self.vertices[vertex - 1])
+            GL.glEnd()
+        GL.glDisable(GL.GL_TEXTURE_2D)
+        GL.glEndList()
+
+
+class Particle(object):
+    def __init__(self, position, direction,
+                 size=.5, color=(0,0,0), life=1):
+        self.position = position
+        self.direction = direction
+        self.size = size
+        self.color = color
+        self.life = life
+    
+    def update(self):
+        if self.life > 0:
+            x, y ,z = self.position
+            xi, yi, zi = self.direction
+            self.position = x+xi, y+yi, z+zi
+        self.life -= 0.01
+    
+    def render(self):
+        x, y, z = self.position
+        color = self.color[:3] + (self.life,)
+        GL.glPushMatrix()
+        GL.glColor(*color)
+        GL.glTranslate(x, y, -z)
+        GLUT.glutSolidSphere(self.size * self.life, 5, 5)
+        """
+        glBegin(GL_QUADS)
+        glTexCoord(0,0);glVertex(-self.size, self.size, 0)
+        glTexCoord(0,1);glVertex(-self.size, -self.size, 0)
+        glTexCoord(1,1);glVertex(self.size, -self.size, 0)
+        glTexCoord(1,0);glVertex(self.size, self.size, 0)
+        glEnd()
+        """
+        GL.glPopMatrix()
+
+
+class ParticleEmitter(Renderer):
+    def __init__(self, num_particles=15):
+        Component.__init__(self)
+        self.num_particles = num_particles
+        self.particles = []
+    
+    def oncollision(self, other):
+        step = int(360 / self.num_particles)
+        for x in xrange(0, 360, step):
+            a = x * math.pi / 180 + ()
+            position = self.transform.position
+            direction = math.sin(a)*0.1, 0, math.cos(a)*0.1
+            color = random.random(), random.random(), 1
+            particle = Particle(position, direction,
+                                color=color, size=.25)
+            self.particles.append(particle)
+    
+    def update(self):
+        for particle in self.particles:
+            if particle.life > 0:
+                particle.update()
+            else:
+                self.particles.remove(particle)
+    
+    def render(self):
+        for particle in self.particles:
+            particle.render()
 
 
 class Rigidbody(Component):
-    
     def __init__(self, density):
         Component.__init__(self)
         self.density = density
@@ -366,27 +421,27 @@ class Camera(Component):
         dx, dy, dz = self.distance
         x, y, z = self.transform.position
         a, b, c = self.orientation
-        glPushMatrix()
-        glTranslatef(-dx, -dy, -dz)
-        glRotatef(-a, 1, 0, 0)
-        glRotatef(-b, 0, 1, 0)
-        glRotatef(c, 0, 0, 1)
-        glTranslatef(-x, -y, z)
+        GL.glPushMatrix()
+        GL.glTranslatef(-dx, -dy, -dz)
+        GL.glRotatef(-a, 1, 0, 0)
+        GL.glRotatef(-b, 0, 1, 0)
+        GL.glRotatef(c, 0, 0, 1)
+        GL.glTranslatef(-x, -y, z)
 
     def pop(self):
-        glPopMatrix()
+        GL.glPopMatrix()
 
     def set_facing_matrix(self):
         a, b, c = self.orientation
-        glRotatef(-a, 0, 0, 1)
-        glRotatef(b, 0, 1, 0)
-        glRotatef(c, 1, 0, 0)
+        GL.glRotatef(-a, 0, 0, 1)
+        GL.glRotatef(b, 0, 1, 0)
+        GL.glRotatef(c, 1, 0, 0)
 
     def set_skybox_data(self):
         a, b, c = self.orientation
-        glRotatef(-a, 1, 0, 0)
-        glRotatef(-b, 0, 1, 0)
-        glRotatef(c, 0, 0, 1)
+        GL.glRotatef(-a, 1, 0, 0)
+        GL.glRotatef(-b, 0, 1, 0)
+        GL.glRotatef(c, 0, 0, 1)
 
 
 class Light(Component):
@@ -591,7 +646,7 @@ class Game(object):
     def mainloop(self, fps=60):
         try:
             self._mainloop(fps)
-        except Error as e:
+        except Exception as e:
             print "Oops! %s: %s" % (e.errno, e.strerror)
         finally:
             OpenGLRenderer.quit()

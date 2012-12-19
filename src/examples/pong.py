@@ -54,7 +54,7 @@ class Limit(GameObject):
 class Ball(GameObject):
     def __init__(self, pos):
         GameObject.__init__(self, Transform(position=pos), SphereCollider(),
-                            Sphere(color=Color.white), BallMovement())
+                            Sphere(color=Color.white), BallMovement(), ParticleEmitter())
 
 class Pong(Game):
     def __init__(self):

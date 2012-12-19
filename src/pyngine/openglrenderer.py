@@ -1,27 +1,27 @@
 import os
 import pygame
-from OpenGL.GL import * # @UnusedWildImport
-from OpenGL.GLU import * # @UnusedWildImport
+import OpenGL.GL as GL
+import OpenGL.GLU as GLU
 
 #TODO: Document class
 class OpenGLRenderer(object):
-    _screenwidth = None
-    _screenheight = None
+    _screen_width = None
+    _screen_height = None
     _aspect = 0
     _viewangle = 45
     _closeview = 0.1
     _farview = 100.0
     
     @classmethod
-    def init(cls, screensize, hwsurface):
-        cls._screenwidth = screensize[0]
-        cls._screenheight = screensize[1]
-        cls._aspect = 1. * screensize[0] / screensize[1]
+    def init(cls, screen_size, hwsurface):
+        cls._screen_width = screen_size[0]
+        cls._screen_height = screen_size[1]
+        cls._aspect = 1. * screen_size[0] / screen_size[1]
         pygame.init()
         params = pygame.OPENGL | pygame.DOUBLEBUF
         if hwsurface:
             params |= pygame.HWSURFACE
-        pygame.display.set_mode(screensize, params)
+        pygame.display.set_mode(screen_size, params)
         
     @classmethod
     def setwindowtitle(cls, title):
@@ -37,56 +37,56 @@ class OpenGLRenderer(object):
         
     @classmethod
     def initmodelviewmatrix(cls):
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
+        GL.glMatrixMode(GL.GL_MODELVIEW)
+        GL.glLoadIdentity()
         
     @classmethod
     def clearscreen(cls):
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
+        GL.glClear(GL.GL_DEPTH_BUFFER_BIT | GL.GL_COLOR_BUFFER_BIT)
         
     @classmethod
     def enable(cls):
-        glEnable(GL_FOG)
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_COLOR_MATERIAL)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_NORMALIZE)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        glEnable(GL_SCISSOR_TEST)
-        glEnable(GL_CULL_FACE)
+        GL.glEnable(GL.GL_FOG)
+        GL.glEnable(GL.GL_TEXTURE_2D)
+        GL.glEnable(GL.GL_COLOR_MATERIAL)
+        GL.glEnable(GL.GL_LIGHTING)
+        GL.glEnable(GL.GL_NORMALIZE)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_BLEND)
+        GL.glEnable(GL.GL_SCISSOR_TEST)
+        GL.glEnable(GL.GL_CULL_FACE)
         
     @classmethod
     def setviewport(cls):
-        glViewport(0, 0, cls._screenwidth, cls._screenheight)
+        GL.glViewport(0, 0, cls._screen_width, cls._screen_height)
         
     @classmethod
     def setperspective(cls):
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        gluPerspective(cls._viewangle, cls._aspect,
+        GL.glMatrixMode(GL.GL_PROJECTION)
+        GL.glLoadIdentity()
+        GLU.gluPerspective(cls._viewangle, cls._aspect,
                        cls._closeview, cls._farview)
         
     @classmethod
     def dostuff(cls):
-        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
-        glShadeModel(GL_SMOOTH)
-        glDepthFunc(GL_LEQUAL)
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glPointSize(10)
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
-        glFogfv(GL_FOG_COLOR, (.5, .5, .5, 1))
-        glFogi(GL_FOG_MODE, GL_LINEAR)
-        glFogf(GL_FOG_DENSITY, .35)
-        glHint(GL_FOG_HINT, GL_NICEST)
-        glFogf(GL_FOG_START, 10.0)
-        glFogf(GL_FOG_END, 125.0)
-        glAlphaFunc(GL_GEQUAL, .5)
-        glClearColor(.5, .5, .5, 1)
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-        glFrontFace(GL_CCW)
-        glCullFace(GL_BACK)
+        GL.glColorMaterial(GL.GL_FRONT, GL.GL_AMBIENT_AND_DIFFUSE)
+        GL.glShadeModel(GL.GL_SMOOTH)
+        GL.glDepthFunc(GL.GL_LEQUAL)
+        GL.glHint(GL.GL_PERSPECTIVE_CORRECTION_HINT, GL.GL_NICEST)
+        GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+        GL.glPointSize(10)
+        GL.glClear(GL.GL_DEPTH_BUFFER_BIT | GL.GL_COLOR_BUFFER_BIT)
+        GL.glFogfv(GL.GL_FOG_COLOR, (.5, .5, .5, 1))
+        GL.glFogi(GL.GL_FOG_MODE, GL.GL_LINEAR)
+        GL.glFogf(GL.GL_FOG_DENSITY, .35)
+        GL.glHint(GL.GL_FOG_HINT, GL.GL_NICEST)
+        GL.glFogf(GL.GL_FOG_START, 10.0)
+        GL.glFogf(GL.GL_FOG_END, 125.0)
+        GL.glAlphaFunc(GL.GL_GEQUAL, .5)
+        GL.glClearColor(.5, .5, .5, 1)
+        GL.glTexEnvi(GL.GL_TEXTURE_ENV, GL.GL_TEXTURE_ENV_MODE, GL.GL_MODULATE)
+        GL.glFrontFace(GL.GL_CCW)
+        GL.glCullFace(GL.GL_BACK)
         
     @classmethod
     def flip(cls):
@@ -96,7 +96,7 @@ class OpenGLRenderer(object):
     def quit(cls):
         pygame.quit()
     
-    _gllights = range(GL_LIGHT0, GL_LIGHT7 + 1) # Max 8 lights
+    _gllights = range(GL.GL_LIGHT0, GL.GL_LIGHT7 + 1) # Max 8 lights
     
     @classmethod
     def getnextlight(cls):
@@ -106,13 +106,31 @@ class OpenGLRenderer(object):
     @classmethod
     def enablelight(cls, gl_light, ambient, diffuse,
                     specular, spot_direction, gl_position):
-        glLightfv(gl_light, GL_AMBIENT, ambient)
-        glLightfv(gl_light, GL_DIFFUSE, diffuse)
-        glLightfv(gl_light, GL_SPECULAR, specular)
-        glLightfv(gl_light, GL_SPOT_DIRECTION, spot_direction)
-        glLightfv(gl_light, GL_POSITION, gl_position)
-        glEnable(gl_light)
+        GL.glLightfv(gl_light, GL.GL_AMBIENT, ambient)
+        GL.glLightfv(gl_light, GL.GL_DIFFUSE, diffuse)
+        GL.glLightfv(gl_light, GL.GL_SPECULAR, specular)
+        GL.glLightfv(gl_light, GL.GL_SPOT_DIRECTION, spot_direction)
+        GL.glLightfv(gl_light, GL.GL_POSITION, gl_position)
+        GL.glEnable(gl_light)
     
     @classmethod
     def disable(cls, foo):
-        glDisable(foo)
+        GL.glDisable(foo)
+    
+    @classmethod
+    def render(cls, renderable):
+        transform = renderable.transform
+        x, y, z = transform.position
+        R = transform.rotation
+        rot = [R[0], R[3], R[6], 0,
+               R[1], R[4], R[7], 0,
+               R[2], R[5], R[8], 0,
+               x, y, -z, 1]
+        GL.glPushMatrix()
+        GL.glMultMatrixd(rot)
+        if transform.scale != (1, 1, 1):
+            GL.glScalef(*transform.scale)
+        if renderable.color is not None:
+            GL.glColor(*renderable.color)
+        GL.glCallList(renderable.gl_list)
+        GL.glPopMatrix()
