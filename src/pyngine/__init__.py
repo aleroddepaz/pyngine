@@ -14,8 +14,6 @@ from physics import PhysicsEngine
 from input import Input
 
 
-VERSION = '0.0.4'
-
 
 # ==============================
 # Component & Subclasses

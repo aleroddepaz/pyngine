@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-from pyngine import VERSION
 
+version = '0.0.4'
 
 long_description = '''Pyngine is a minimalist component-based game engine
 for developing 3D Indie games easily for Linux, Mac OS X and Windows'''
 
 setup(
     name = 'PyNgine',
-    version = VERSION,
+    version = version,
     license = 'GPLv3',
     description = 'Minimalist 3D game engine',
     long_description = long_description,
@@ -20,7 +20,7 @@ setup(
     packages = ['pyngine'],
     package_dir = {'pyngine': 'src/pyngine'},
     package_data = {'pyngine': ['data/*']},
-    requires = ['PyOpenGL'],
+    requires = ['Pygame', 'PyOpenGL', 'PyODE'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
