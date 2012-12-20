@@ -1,14 +1,18 @@
+# Python Standard Library modules
 import random
 import math
 import os
 
+# Pygame and PyOpenGL dependencies
 import pygame
 import OpenGL.GL as GL
 import OpenGL.GLUT as GLUT
 
+# PyNgine modules
 from openglrenderer import OpenGLRenderer
 from physics import PhysicsEngine
 from input import Input
+
 
 VERSION = '0.0.4'
 
@@ -23,30 +27,71 @@ class Component(object):
 
     @property
     def transform(self):
+        """
+        Reference to the gameobject's transform
+        """
         return self.gameobject.transform
     
     @property
     def rigidbody(self):
+        """
+        Reference to the gameobject's rigidbody
+        """
         return self.gameobject.rigidbody
     
     @property
     def collider(self):
+        """
+        Reference to the gameobject's collider
+        """
         return self.gameobject.collider
     
     def start(self):
+        """
+        Method called when the component is added to the game object
+        """
         pass
     
     def update(self):
+        """
+        Method called in each iteration of the gameloop
+        """
         pass
     
     def oncollision(self, other):
+        """
+        Method called in each iteration of the gameloop when
+        the component's gameobject has collided with another gameobject
+        
+        Parameters
+        ----------
+        other : GameObject
+            The other gameobject which has collided 
+            with the component's gameobject 
+        """
         pass
     
     def handlemessage(self, string, data):
-        pass
+        """
+        Calls dynamically a method of the component
+        
+        Parameters
+        ----------
+        string : str
+            Method name
+        data : list
+            Arguments for the called method
+        """
+        if string in dir(Component):
+            raise TypeError, "Cannot call Component class methods"
+        if hasattr(self, string):
+            return self.__getattribute__(string)(*data)
 
 
-class Renderer(Component):
+class Renderable(Component):
+    """
+    Component used for enabling 3D rendering of a gameobject
+    """
     def __init__(self, color):
         Component.__init__(self)
         self.gl_list = GL.glGenLists(1)
@@ -56,38 +101,112 @@ class Renderer(Component):
         OpenGLRenderer.render(self)
 
 
-class Cube(Renderer):
+class Cube(Renderable):
+    """
+    Renderable component for displaying a cube
+    """
     def __init__(self, color=(0, 0, 0, 1)):
-        Renderer.__init__(self, color)
+        Renderable.__init__(self, color)
         GL.glNewList(self.gl_list, GL.GL_COMPILE)
         GLUT.glutSolidCube(1)
         GL.glEndList()
 
 
-class Sphere(Renderer):
+class Sphere(Renderable):
+    """
+    Renderable component for displaying a sphere
+    """
     slices = 18
     stacks = 18
     
     def __init__(self, color=(0, 0, 0, 1)):
-        Renderer.__init__(self, color)
+        Renderable.__init__(self, color)
         GL.glNewList(self.gl_list, GL.GL_COMPILE)
         GLUT.glutSolidSphere(.5, Sphere.slices, Sphere.stacks)
         GL.glEndList()
 
 
-class Torus(Renderer):
+class Torus(Renderable):
+    """
+    Renderable component for displaying a torus
+    """
     slices = 15
     rings = 15
     
     def __init__(self, inner=1, outer=1, color=(0, 0, 0, 1)):
-        Renderer.__init__(self, color)
+        Renderable.__init__(self, color)
         GL.glNewList(self.gl_list, GL.GL_COMPILE)
         f = inner+outer*2.
         GLUT.glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
         GL.glEndList()
 
 
-class Mesh(Renderer):
+class Mesh(Renderable):
+    """
+    Renderable component for imported meshes
+    """
+    def __init__(self, filename):
+        """
+        Loads a mesh from an OBJ file
+        
+        Parameters
+        ----------
+        filename : str
+            Path to the OBJ file
+        """
+        Renderable.__init__(self, (0,0,0,1))
+        filename = os.path.join(Mesh.mesh_folder, filename)
+        self.vertices = []
+        self.normals = []
+        self.texcoords = []
+        self.faces = []
+        self.material = None
+        for line in open(filename, 'r'):
+            values = self._process_line(line)
+            if not values:
+                continue
+            elif values[0] == 'v':
+                v = map(float, values[1:4])
+                self.vertices.append(v)
+            elif values[0] == 'vn':
+                v = map(float, values[1:4])
+                self.normals.append(v)
+            elif values[0] == 'vt':
+                self.texcoords.append(map(float, values[1:3]))
+            elif values[0] in ('usemtl', 'usemat'):
+                self.material = values[1]
+            elif values[0] == 'mtllib':
+                self.mtl = self._mtl(values[1])
+            elif values[0] == 'f':
+                self._process_face(values[1:])
+        GL.glNewList(self.gl_list, GL.GL_COMPILE)
+        GL.glEnable(GL.GL_TEXTURE_2D)
+        GL.glFrontFace(GL.GL_CCW)
+        self._process_faces()
+        GL.glDisable(GL.GL_TEXTURE_2D)
+        GL.glEndList()
+
+    def _process_line(self, line):
+        if not line.startswith('#'):
+            return line.split()
+
+    def _mtl(self, filename):
+        contents = {}
+        mtl = None
+        for line in open(filename, 'r'):
+            values = self._process_line(line)
+            if not values:
+                continue
+            elif values[0] == 'newmtl':
+                mtl = contents[values[1]] = {}
+            elif mtl is None:
+                raise ValueError, "MTL file does not start with newmtl stmt"
+            elif values[0] == 'map_Kd':
+                self._load_texture_referred(mtl, values)
+            else:
+                mtl[values[0]] = map(float, values[1:])
+        return contents
+    
     def _load_texture_referred(self, mtl, values):
         mtl[values[0]] = values[1]
         surf = pygame.image.load(mtl['map_Kd'])
@@ -104,75 +223,32 @@ class Mesh(Renderer):
         GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA,
                      ix, iy, 0, GL.GL_RGBA,
                      GL.GL_UNSIGNED_BYTE, image)
-
-    def _mtl(self, filename):
-        contents = {}
-        mtl = None
-        for line in open(filename, 'r'):
-            if line.startswith('#'): continue
-            values = line.split()
-            if not values: continue
-            if values[0] == 'newmtl':
-                mtl = contents[values[1]] = {}
-            elif mtl is None:
-                raise ValueError, "mtl file doesn't start with newmtl stmt"
-            elif values[0] == 'map_Kd':
-                self._load_texture_referred(mtl, values)
+    
+    def _load_face(self, values):
+        face = []
+        texcoords = []
+        norms = []
+        for v in values:
+            w = v.split('/')
+            face.append(int(w[0]))
+            if len(w) >= 2 and len(w[1]) > 0:
+                texcoords.append(int(w[1]))
             else:
-                mtl[values[0]] = map(float, values[1:])
-        return contents
-
-    def __init__(self, filename):
-        Renderer.__init__(self, (0,0,0,1))
-        filename = os.sep.join([Mesh.mesh_folder, filename])
-        self.vertices = []
-        self.normals = []
-        self.texcoords = []
-        self.faces = []
-        material = None
-        for line in open(filename, 'r'):
-            if line.startswith('#'): continue
-            values = line.split()
-            if not values:
-                continue
-            elif values[0] == 'v':
-                v = map(float, values[1:4])
-                self.vertices.append(v)
-            elif values[0] == 'vn':
-                v = map(float, values[1:4])
-                self.normals.append(v)
-            elif values[0] == 'vt':
-                self.texcoords.append(map(float, values[1:3]))
-            elif values[0] in ('usemtl', 'usemat'):
-                material = values[1]
-            elif values[0] == 'mtllib':
-                self.mtl = self._mtl(values[1])
-            elif values[0] == 'f':
-                face = []
-                texcoords = []
-                norms = []
-                for v in values[1:]:
-                    w = v.split('/')
-                    face.append(int(w[0]))
-                    if len(w) >= 2 and len(w[1]) > 0:
-                        texcoords.append(int(w[1]))
-                    else:
-                        texcoords.append(0)
-                    if len(w) >= 3 and len(w[2]) > 0:
-                        norms.append(int(w[2]))
-                    else:
-                        norms.append(0)
-                self.faces.append((face, norms, texcoords, material))
-        GL.glNewList(self.gl_list, GL.GL_COMPILE)
-        GL.glEnable(GL.GL_TEXTURE_2D)
-        GL.glFrontFace(GL.GL_CCW)
+                texcoords.append(0)
+            if len(w) >= 3 and len(w[2]) > 0:
+                norms.append(int(w[2]))
+            else:
+                norms.append(0)
+        self.faces.append((face, norms, texcoords, self.material))
+    
+    def _process_faces(self):
         for face in self.faces:
             vertices, normals, texture_coords, material = face
             mtl = self.mtl[material]
             if 'texture_Kd' in mtl:
-                GL.glBindTexture(GL.GL_TEXTURE_2D, mtl['texture_Kd']) # use diffuse texmap
+                GL.glBindTexture(GL.GL_TEXTURE_2D, mtl['texture_Kd'])
             else:
-                GL.glColor(*mtl['Kd']) # just use diffuse colour
+                GL.glColor(*mtl['Kd'])
             GL.glBegin(GL.GL_POLYGON)
             for i, (vertex, normal) in enumerate(zip(vertices, normals)):
                 if normal > 0:
@@ -180,9 +256,7 @@ class Mesh(Renderer):
                 if texture_coords[i] > 0:
                     GL.glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
                 GL.glVertex3fv(self.vertices[vertex - 1])
-            GL.glEnd()
-        GL.glDisable(GL.GL_TEXTURE_2D)
-        GL.glEndList()
+            GL.glEnd()            
 
 
 class Particle(object):
@@ -208,18 +282,10 @@ class Particle(object):
         GL.glColor(*color)
         GL.glTranslate(x, y, -z)
         GLUT.glutSolidSphere(self.size * self.life, 5, 5)
-        """
-        glBegin(GL_QUADS)
-        glTexCoord(0,0);glVertex(-self.size, self.size, 0)
-        glTexCoord(0,1);glVertex(-self.size, -self.size, 0)
-        glTexCoord(1,1);glVertex(self.size, -self.size, 0)
-        glTexCoord(1,0);glVertex(self.size, self.size, 0)
-        glEnd()
-        """
         GL.glPopMatrix()
 
 
-class ParticleEmitter(Renderer):
+class ParticleEmitter(Renderable):
     def __init__(self, num_particles=15):
         Component.__init__(self)
         self.num_particles = num_particles
@@ -228,7 +294,7 @@ class ParticleEmitter(Renderer):
     def oncollision(self, other):
         step = int(360 / self.num_particles)
         for x in xrange(0, 360, step):
-            a = x * math.pi / 180 + ()
+            a = x * math.pi / 180
             position = self.transform.position
             direction = math.sin(a)*0.1, 0, math.cos(a)*0.1
             color = random.random(), random.random(), 1
@@ -288,7 +354,9 @@ class Rigidbody(Component):
 
 
 class Collider(Component):
-    
+    """
+    Component used for collision detection
+    """
     def __init__(self):
         Component.__init__(self)
         self._geom = None
@@ -493,6 +561,14 @@ class GameObject(object):
         for c in components: self.addcomponent(c)
         
     def getcomponentbyclass(self, cls):
+        """
+        Returns an attached component of a specific class
+        
+        Parameters
+        ----------
+        cls : classobj
+            Class of the component
+        """
         for c in self.components:
             if isinstance(c, cls):
                 return c
@@ -502,6 +578,9 @@ class GameObject(object):
             self.addcomponent(component)
 
     def addcomponent(self, component):
+        """
+        Adds a component to the gameobject
+        """
         if isinstance(component, Camera):
             GameObject._camera = component
         self._updatecomponents('append', component)
@@ -512,16 +591,20 @@ class GameObject(object):
         component.start()
         
     def removecomponent(self, component):
+        """
+        Removes a component from the gameobject
+        """
         if component is None: return
         if isinstance(component, Camera):
             GameObject._camera = None
         self._updatecomponents('remove', component)
         Component.__init__(component)
 
-    def _checkfield(self, clsstring, component): # Use with caution!
-        if isinstance(component, eval(clsstring.capitalize())):
-            oldcomponent = self.__dict__[clsstring]
-            self.__dict__[clsstring] = component
+    def _checkfield(self, cls_string, component):
+        cls = eval(cls_string.capitalize())
+        if isinstance(component, cls):
+            oldcomponent = self.__dict__[cls_string]
+            self.__dict__[cls_string] = component
             self.removecomponent(oldcomponent)
             
     def _updatecomponents(self, action, component):
@@ -529,24 +612,30 @@ class GameObject(object):
             getattr(GameObject._lights, action)(component)
         if isinstance(component, Component):
             getattr(self.components, action)(component)
-        if isinstance(component, Renderer):
+        if isinstance(component, Renderable):
             getattr(self.renderables, action)(component)
             
     def handlemessage(self, string, data=None):
         for component in self.components:
             result = component.handlemessage(string, data)
-            if result is not None: return result
+            if result is not None:
+                return result
 
     def update(self):
-        for component in self.components: component.update()
-        for gameobject in self.children: gameobject.update()
+        for component in self.components:
+            component.update()
+        for gameobject in self.children:
+            gameobject.update()
 
     def render(self):
-        for component in self.renderables: component.render()
-        for gameobject in self.children: gameobject.render()
+        for component in self.renderables:
+            component.render()
+        for gameobject in self.children:
+            gameobject.render()
 
     def oncollision(self, other):
-        for component in self.components: component.oncollision(other)
+        for component in self.components:
+            component.oncollision(other)
 
     def destroy(self):
         self.parent.removegameobject(self)
@@ -556,6 +645,9 @@ class GameObject(object):
             self._addgameobject(gameobject)
 
     def addgameobject(self, gameobject):
+        """
+        Adds a gameobject as a child
+        """
         self._addgameobject(gameobject)
 
     def _addgameobject(self, gameobject):
@@ -568,13 +660,33 @@ class GameObject(object):
 
 
 class CubePrimitive(GameObject):
+    """
+    Primitive for a basic solid cube
+    """
     def __init__(self, transform, color, density=10):
+        """
+        Parameters
+        ----------
+        transform : Transform
+        color : Color
+        density : int
+        """
         GameObject.__init__(self, transform, Rigidbody(density),
                             Cube(color), BoxCollider())
 
 
 class SpherePrimitive(GameObject):
+    """
+    Primitive for a basic solid sphere
+    """
     def __init__(self, transform, color, density=10):
+        """
+        Parameters
+        ----------
+        transform : Transform
+        color : Color
+        density : int
+        """
         GameObject.__init__(self, transform, Rigidbody(density),
                             Sphere(color), SphereCollider())
 
@@ -622,32 +734,54 @@ class Color(object):
 
 
 class Scene(GameObject):
+    """
+    Root gameobject of a game
+    """
     def __init__(self, gravity=(0, -9.8, 0), erp=.8, cfm=1e-5):
+        """
+        Initializes the physics for the current scene
+        """
         GameObject.__init__(self, Transform())
         PhysicsEngine.start(gravity, erp, cfm)
 
 
 class Game(object):
-    
-    def __init__(self, screensize=(800, 600), title="Pyngine game",
-                 hwsurface=False, path_to_icon=None):
-        self.screensize = screensize
+    def __init__(self, screen_size=(800, 600), title="Pyngine game",
+                 hwsurface=False, fullscreen=False, path_to_icon=None):
+        """
+        Parameters
+        ----------
+        screen_size : tuple
+        title : str
+        hwsurface : bool
+        fullscreen : bool
+        path_to_icon : str
+        """
+        self.screen_size = screen_size
         self.title = title
         self.camera = None
         self.lights = []
         self.scene = Scene()
         GLUT.glutInit([])
-        OpenGLRenderer.init(screensize, hwsurface)
+        OpenGLRenderer.init(screen_size, hwsurface, fullscreen)
         OpenGLRenderer.setwindowtitle(title)        
         OpenGLRenderer.setwindowicon(path_to_icon)
         OpenGLRenderer.dostuff()
         OpenGLRenderer.enable()
         
     def mainloop(self, fps=60):
+        """
+        Starts the mainloop of the game
+        
+        Parameters
+        ----------
+        fps : int
+            Frames per second rate
+        """
         try:
             self._mainloop(fps)
         except Exception as e:
-            print "Oops! %s: %s" % (e.errno, e.strerror)
+            print e
         finally:
             OpenGLRenderer.quit()
             

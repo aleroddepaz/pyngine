@@ -13,7 +13,7 @@ class OpenGLRenderer(object):
     _farview = 100.0
     
     @classmethod
-    def init(cls, screen_size, hwsurface):
+    def init(cls, screen_size, hwsurface, fullscreen):
         cls._screen_width = screen_size[0]
         cls._screen_height = screen_size[1]
         cls._aspect = 1. * screen_size[0] / screen_size[1]
@@ -21,6 +21,8 @@ class OpenGLRenderer(object):
         params = pygame.OPENGL | pygame.DOUBLEBUF
         if hwsurface:
             params |= pygame.HWSURFACE
+        if fullscreen:
+            params |= pygame.FULLSCREEN
         pygame.display.set_mode(screen_size, params)
         
     @classmethod

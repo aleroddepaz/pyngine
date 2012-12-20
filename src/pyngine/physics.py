@@ -2,7 +2,9 @@ import ode
 
 
 class PhysicsEngineError(Exception):
-    """ Class for errors in PhysicsEngine methods """
+    """
+    Class for errors within the PhysicsEngine methods
+    """
     def __init__(self, msg):
         Exception.__init__(self, msg)
 

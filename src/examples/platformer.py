@@ -9,9 +9,9 @@ class PlayerMovement(Component):
         
     def update(self):
         rigidbody = self.gameobject.rigidbody
-        x = self.speed * Input.gethorizontalaxis()
+        x = self.speed * Input.get_horizontal_axis()
         y = rigidbody.velocity[1]
-        z = self.speed * Input.getverticalaxis()
+        z = self.speed * Input.get_vertical_axis()
         rigidbody.velocity = (x, y, z)
         if Input.getkey(pygame.K_SPACE) and self.canjump:
             self.canjump = False
