@@ -257,6 +257,39 @@ class Mesh(Renderable):
             GL.glEnd()            
 
 
+class Audio(Component):
+    def __init__(self, filename):
+        """
+        Creates an audio component from an audio file
+        
+        Parameters
+        ----------
+        filename : str
+            Path to the audio file
+        """
+        Component.__init__(self)
+        self.sound = pygame.mixer.Sound(filename)
+    
+    @property
+    def volume(self):
+        self.sound.get_volume()
+    
+    @volume.setter
+    def volume(self, value):
+        self.sound.set_volume(value)
+    
+    def play(self, loops=0, maxtime=0, fade_ms=0):
+        """
+        Plays the audio sound
+        """
+        self.sound.play(loops, maxtime, fade_ms)
+    
+    def stop(self):
+        """
+        Stops the audio sound
+        """
+        self.sound.stop()
+
 class Particle(object):
     def __init__(self, position, direction,
                  size=.5, color=(0,0,0), life=1):
