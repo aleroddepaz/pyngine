@@ -1,5 +1,6 @@
 # Python Standard Library modules
 import random
+import json
 import math
 import os
 
@@ -9,6 +10,7 @@ import OpenGL.GL as GL
 import OpenGL.GLUT as GLUT
 
 # PyNgine modules
+from geom import Quaternion
 from openglrenderer import OpenGLRenderer
 from physics import PhysicsEngine
 from input import Input
@@ -356,7 +358,7 @@ class Rigidbody(Component):
         mass.setBox(self.density, *self.transform.scale)
         self._body.setMass(mass)
         self._body.setPosition(self.transform.position)
-        self._body.setRotation(self.transform.rotation)
+        self._body.setQuaternion(self.transform.rotation)
         self.transform._setbody(self._body)
         if self.collider is not None:
             self.collider._setbody(self._body)
@@ -395,7 +397,7 @@ class Collider(Component):
     def _fixedstart(self):
         self._geom.gameobject = self.gameobject
         self._geom.setPosition(self.transform.position)
-        self._geom.setRotation(self.transform.rotation)
+        self._geom.setQuaternion(self.transform.rotation)
         self.transform._setgeom(self._geom)
         
     def _setbody(self, body):
@@ -428,9 +430,9 @@ class SphereCollider(Collider):
 
 
 class Transform(Component):
-    #TODO: Fix rotation
+
     def __init__(self, position=(0, 0, 0),
-                 rotation=(1, 0, 0, 0, 1, 0, 0, 0, 1), scale=(1, 1, 1)):
+                 rotation=[0,0,1,0], scale=(1, 1, 1)):
         Component.__init__(self)
         self._position = position
         self._rotation = rotation
@@ -466,6 +468,8 @@ class Transform(Component):
     def position(self):
         if self._body is not None:
             return self._body.getPosition()
+        if self._geom is not None:
+            return self._geom.getPosition()
         return self._position
     
     @position.setter
@@ -479,13 +483,17 @@ class Transform(Component):
     @property
     def rotation(self):
         if self._body is not None:
-            return self._body.getRotation()
+            return self._body.getQuaternion()
+        if self._geom is not None:
+            return self._geom.getQuaternion()
         return self._rotation
     
     @rotation.setter
     def rotation(self, value):
         if self._body is not None:
-            self._body.setRotation(value)
+            self._body.setQuaternion(value)
+        if self._geom is not None:
+            self._geom.setQuaternion(value)
         self._rotation = value
 
     @property
@@ -496,21 +504,37 @@ class Transform(Component):
     def scale(self, value):
         self._scale = value
 
-    def move(self, movement):
+    @property
+    def right(self):
+        q = Quaternion(*self.rotation)
+        return q.rotate_vector([1, 0, 0])
+
+    @property
+    def up(self):
+        q = Quaternion(*self.rotation)
+        return q.rotate_vector([0, 1, 0])
+
+    @property
+    def forward(self):
+        q = Quaternion(*self.rotation)
+        return q.rotate_vector([0, 0, 1])
+
+    def translate(self, movement):
         """
         Moves the transform a certain offset
         """
         self.position = tuple(map(sum, zip(self.position, movement)))
 
-    def rotate(self, rotation):
+    def rotate(self, axis, angle):
         """
         Rotates the transform a certain offset
         """
-        self.rotation = tuple(map(sum, zip(self.rotation, rotation)))
+        q1 = Quaternion(*self.rotation)
+        q2 = Quaternion.from_axis(axis, angle)
+        self.rotation = q1 * q2
 
 
-class Camera(Component):
-    
+class Camera(Component):    
     def __init__(self, distance=(0, 0, 0), orientation=(0, 0, 0)):
         Component.__init__(self)
         self.distance = distance
@@ -530,21 +554,8 @@ class Camera(Component):
     def pop(self):
         GL.glPopMatrix()
 
-    def set_facing_matrix(self):
-        a, b, c = self.orientation
-        GL.glRotatef(-a, 0, 0, 1)
-        GL.glRotatef(b, 0, 1, 0)
-        GL.glRotatef(c, 1, 0, 0)
-
-    def set_skybox_data(self):
-        a, b, c = self.orientation
-        GL.glRotatef(-a, 1, 0, 0)
-        GL.glRotatef(-b, 0, 1, 0)
-        GL.glRotatef(c, 0, 0, 1)
-
 
 class Light(Component):
-    
     def __init__(self, ambient=(0, 0, 0, 1), diffuse=(1, 1, 1, 1),
                  specular=(1, 1, 1, 1), spot_direction=(0, 0, 1)):
         Component.__init__(self)
@@ -646,19 +657,25 @@ class GameObject(object):
         if isinstance(component, Renderable):
             getattr(self.renderables, action)(component)
             
-    def handlemessage(self, string, data=None):
+    def handle_message(self, string, data=None):
         for component in self.components:
-            result = component.handlemessage(string, data)
+            result = component.handle_message(string, data)
             if result is not None:
                 return result
 
     def update(self):
+        """
+        Updates the gameobject and its children
+        """
         for component in self.components:
             component.update()
         for gameobject in self.children:
             gameobject.update()
 
     def render(self):
+        """
+        Renders the gameobject and its children
+        """
         for component in self.renderables:
             component.render()
         for gameobject in self.children:
@@ -686,6 +703,9 @@ class GameObject(object):
         gameobject.parent = self
 
     def removegameobject(self, gameobject):
+        """
+        Removes a gameobject from the children
+        """
         self.children.remove(gameobject)
         gameobject.parent = None
 
@@ -758,11 +778,10 @@ class Color(object):
         return self.__color
 
 
+
 # ==============================
 # Game
 # ==============================
-
-
 
 class Scene(GameObject):
     """
@@ -778,13 +797,12 @@ class Scene(GameObject):
 
 class Game(object):
     def __init__(self, screen_size=(800, 600), title="Pyngine game",
-                 hwsurface=False, fullscreen=False, path_to_icon=None):
+                 fullscreen=False, path_to_icon=None):
         """
         Parameters
         ----------
         screen_size : tuple
         title : str
-        hwsurface : bool
         fullscreen : bool
         path_to_icon : str
         """
@@ -793,12 +811,9 @@ class Game(object):
         self.camera = None
         self.lights = []
         self.scene = Scene()
-        GLUT.glutInit([])
-        OpenGLRenderer.init(screen_size, hwsurface, fullscreen)
-        OpenGLRenderer.setwindowtitle(title)        
-        OpenGLRenderer.setwindowicon(path_to_icon)
-        OpenGLRenderer.dostuff()
-        OpenGLRenderer.enable()
+        OpenGLRenderer.init(screen_size, fullscreen)
+        OpenGLRenderer.set_window_title(title)        
+        OpenGLRenderer.set_window_icon(path_to_icon)
         
     def mainloop(self, fps=60):
         """
@@ -811,7 +826,7 @@ class Game(object):
         """
         try:
             self._mainloop(fps)
-        except Exception as e:
+        except NameError as e:
             print e
         finally:
             OpenGLRenderer.quit()
@@ -824,15 +839,14 @@ class Game(object):
             self.scene.update()
             self._renderloop()
             PhysicsEngine.step(step)
-            clock.tick(fps)
+            delta = clock.tick(fps)
+            Game.delta = delta / 1000.
             
     def _renderloop(self):
-        OpenGLRenderer.setviewport()
-        OpenGLRenderer.setperspective()
-        OpenGLRenderer.initmodelviewmatrix()
         OpenGLRenderer.clearscreen()
         if GameObject._camera: GameObject._camera.push()
         for light in GameObject._lights: light.enable()
         self.scene.render()
         if GameObject._camera: GameObject._camera.pop()
         OpenGLRenderer.flip()
+

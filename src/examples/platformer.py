@@ -28,7 +28,7 @@ class Platform(GameObject):
         
 
 class Platformer(Game):
-    
+
     def __init__(self):
         Game.__init__(self)
         light = GameObject(Transform((0,5,-5)))

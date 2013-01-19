@@ -42,7 +42,7 @@ class TestTransform(unittest.TestCase):
         self.transform = Transform(position=(0,0,0))
         
     def testMove(self):
-        self.transform.move(movement=(1,1,1))
+        self.transform.translate(movement=(1,1,1))
         assert self.transform.position == (1,1,1)
 
 

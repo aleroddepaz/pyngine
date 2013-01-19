@@ -2,6 +2,16 @@ from pyngine import * #@UnusedWildImport
 from pygame import K_UP, K_DOWN, K_w, K_s
 
 
+class Qwe(Component):
+    def start(self):
+        self.angle = 0
+    def update(self):
+        if Input.getkey(pygame.K_q):
+            self.transform.rotation = Quaternion.from_axis([0,1,0], self.angle)
+            self.angle += 0.01
+            print(self.transform.right)
+
+
 class KeyboardMovement(Component):
     def __init__(self, up, dowm):
         Component.__init__(self)
@@ -11,9 +21,9 @@ class KeyboardMovement(Component):
     def update(self):
         z = self.transform.position[2]
         if Input.getkey(self.up) and z < 7:
-            self.transform.move((0, 0, self.speed))
+            self.transform.translate((0, 0, self.speed))
         if Input.getkey(self.down) and z > -7:
-            self.transform.move((0, 0, -self.speed))
+            self.transform.translate((0, 0, -self.speed))
 
 class ArrowMovement(KeyboardMovement):
     def __init__(self):
@@ -27,22 +37,25 @@ class BallMovement(Component):
     def start(self):
         self.start_position = self.transform.position
         self.movement = (.1, 0, .1)
+        self.last_collision = None
     def update(self):
-        self.transform.move(self.movement)
+        self.transform.translate(self.movement)
         x = self.transform.position[0]
         if x > 30 or x < -30:
             self.transform.position = self.start_position
             self.movement = (.1, 0, .1)
     def oncollision(self, other):
         x, _, z = self.movement
-        if other.tag == 'Player': x *= -1.025
+        if other.tag == 'Player' and self.last_collision is not other:
+            self.last_collision = other
+            x *= -1.025
         elif other.tag == 'Limit': z *= -1.01
         self.movement = (x, 0, z)
 
 class Paddle(GameObject):
     def __init__(self, pos, movement):
         GameObject.__init__(self, Transform(position=pos, scale=(1, 1, 5)),
-                            BoxCollider(), Cube(Color.blue), movement)
+                            BoxCollider(), Cube(Color.blue), movement, Qwe())
         self.tag = 'Player'
 
 class Limit(GameObject):

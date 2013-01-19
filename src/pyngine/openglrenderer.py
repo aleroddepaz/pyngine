@@ -1,36 +1,111 @@
 import os
 import pygame
-import OpenGL.GL as GL
-import OpenGL.GLU as GLU
+from OpenGL.GL import * # @UnusedWildImport
+from OpenGL.GLU import * # @UnusedWildImport
 
-#TODO: Document class
+
+
 class OpenGLRenderer(object):
-    _screen_width = None
-    _screen_height = None
-    _aspect = 0
+    """
+    Class used as a facade to work with SDL
+    and OpenGL capabilities
+    """
+    _screen = None
     _viewangle = 45
     _closeview = 0.1
     _farview = 100.0
+    _clear_color = (.5, .5, .5, 1)
+    _gl_lights = range(GL_LIGHT0, GL_LIGHT7 + 1)
     
     @classmethod
-    def init(cls, screen_size, hwsurface, fullscreen):
-        cls._screen_width = screen_size[0]
-        cls._screen_height = screen_size[1]
-        cls._aspect = 1. * screen_size[0] / screen_size[1]
+    def init(cls, screen_size, fullscreen):
+        """
+        Initializes SDL and OpenGL
+        
+        Parameters
+        ----------
+        screen_size : tuple
+            2-tuple indicating widht and height of the screen
+        fullscreen : bool
+            Flag to set the window in full screen mode or not
+        """
         pygame.init()
-        params = pygame.OPENGL | pygame.DOUBLEBUF
-        if hwsurface:
-            params |= pygame.HWSURFACE
-        if fullscreen:
-            params |= pygame.FULLSCREEN
-        pygame.display.set_mode(screen_size, params)
+        params = pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE
+        if fullscreen: params |= pygame.FULLSCREEN
+        cls._screen = pygame.display.set_mode(screen_size, params)
+        cls.resize(*screen_size)
+        cls.enable()
+        cls.define_settings()
+    
+    @classmethod
+    def resize(cls, width, height):
+        """
+        Resizes the window according to the new width and height
+        
+        Parameters
+        ----------
+        width : int
+        height : int
+        """
+        glViewport(0, 0, width, height)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        gluPerspective(cls._viewangle, float(width)/height,
+                       cls._closeview, cls._farview)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+    
+    @classmethod
+    def enable(cls):
+        """
+        Enables the GL capabilities needed
+        """
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_COLOR_MATERIAL)
+        glEnable(GL_LIGHTING)
+        glEnable(GL_NORMALIZE)
+        glEnable(GL_BLEND)
+        glEnable(GL_CULL_FACE)
+    
+    @classmethod
+    def define_settings(cls):
+        """
+        Specifies the settings used for the GL capabilities
+        """
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
+        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
+        glShadeModel(GL_SMOOTH)
+        glDepthFunc(GL_LEQUAL)
+        glHint(GL_FOG_HINT, GL_NICEST)
+        glPointSize(10)
+        glClearColor(*cls._clear_color)
+        glFrontFace(GL_CCW)
+        glCullFace(GL_BACK)
         
     @classmethod
-    def setwindowtitle(cls, title):
+    def set_window_title(cls, title):
+        """
+        Sets the window title
+        
+        Parameters
+        ----------
+        title : str
+        """
         pygame.display.set_caption(title)
         
     @classmethod
-    def setwindowicon(cls, path):
+    def set_window_icon(cls, path):
+        """
+        Sets the window icon
+        
+        Parameters
+        ----------
+        path : str
+            Path to the .ico file
+        """
         if path is None:
             abspath = os.path.split(os.path.abspath(__file__))
             path = os.path.join(abspath[0], 'data', 'icon.ico')
@@ -38,58 +113,9 @@ class OpenGLRenderer(object):
         pygame.display.set_icon(icon)
         
     @classmethod
-    def initmodelviewmatrix(cls):
-        GL.glMatrixMode(GL.GL_MODELVIEW)
-        GL.glLoadIdentity()
-        
-    @classmethod
     def clearscreen(cls):
-        GL.glClear(GL.GL_DEPTH_BUFFER_BIT | GL.GL_COLOR_BUFFER_BIT)
-        
-    @classmethod
-    def enable(cls):
-        GL.glEnable(GL.GL_FOG)
-        GL.glEnable(GL.GL_TEXTURE_2D)
-        GL.glEnable(GL.GL_COLOR_MATERIAL)
-        GL.glEnable(GL.GL_LIGHTING)
-        GL.glEnable(GL.GL_NORMALIZE)
-        GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glEnable(GL.GL_BLEND)
-        GL.glEnable(GL.GL_SCISSOR_TEST)
-        GL.glEnable(GL.GL_CULL_FACE)
-        
-    @classmethod
-    def setviewport(cls):
-        GL.glViewport(0, 0, cls._screen_width, cls._screen_height)
-        
-    @classmethod
-    def setperspective(cls):
-        GL.glMatrixMode(GL.GL_PROJECTION)
-        GL.glLoadIdentity()
-        GLU.gluPerspective(cls._viewangle, cls._aspect,
-                       cls._closeview, cls._farview)
-        
-    @classmethod
-    def dostuff(cls):
-        GL.glColorMaterial(GL.GL_FRONT, GL.GL_AMBIENT_AND_DIFFUSE)
-        GL.glShadeModel(GL.GL_SMOOTH)
-        GL.glDepthFunc(GL.GL_LEQUAL)
-        GL.glHint(GL.GL_PERSPECTIVE_CORRECTION_HINT, GL.GL_NICEST)
-        GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
-        GL.glPointSize(10)
-        GL.glClear(GL.GL_DEPTH_BUFFER_BIT | GL.GL_COLOR_BUFFER_BIT)
-        GL.glFogfv(GL.GL_FOG_COLOR, (.5, .5, .5, 1))
-        GL.glFogi(GL.GL_FOG_MODE, GL.GL_LINEAR)
-        GL.glFogf(GL.GL_FOG_DENSITY, .35)
-        GL.glHint(GL.GL_FOG_HINT, GL.GL_NICEST)
-        GL.glFogf(GL.GL_FOG_START, 10.0)
-        GL.glFogf(GL.GL_FOG_END, 125.0)
-        GL.glAlphaFunc(GL.GL_GEQUAL, .5)
-        GL.glClearColor(.5, .5, .5, 1)
-        GL.glTexEnvi(GL.GL_TEXTURE_ENV, GL.GL_TEXTURE_ENV_MODE, GL.GL_MODULATE)
-        GL.glFrontFace(GL.GL_CCW)
-        GL.glCullFace(GL.GL_BACK)
-        
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
+
     @classmethod
     def flip(cls):
         pygame.display.flip()
@@ -98,41 +124,87 @@ class OpenGLRenderer(object):
     def quit(cls):
         pygame.quit()
     
-    _gllights = range(GL.GL_LIGHT0, GL.GL_LIGHT7 + 1) # Max 8 lights
-    
     @classmethod
     def getnextlight(cls):
-        try: return cls._gllights.pop()
+        try: return cls._gl_lights.pop()
         except IndexError: return None
 
     @classmethod
     def enablelight(cls, gl_light, ambient, diffuse,
                     specular, spot_direction, gl_position):
-        GL.glLightfv(gl_light, GL.GL_AMBIENT, ambient)
-        GL.glLightfv(gl_light, GL.GL_DIFFUSE, diffuse)
-        GL.glLightfv(gl_light, GL.GL_SPECULAR, specular)
-        GL.glLightfv(gl_light, GL.GL_SPOT_DIRECTION, spot_direction)
-        GL.glLightfv(gl_light, GL.GL_POSITION, gl_position)
-        GL.glEnable(gl_light)
+        glLightfv(gl_light, GL_AMBIENT, ambient)
+        glLightfv(gl_light, GL_DIFFUSE, diffuse)
+        glLightfv(gl_light, GL_SPECULAR, specular)
+        glLightfv(gl_light, GL_SPOT_DIRECTION, spot_direction)
+        glLightfv(gl_light, GL_POSITION, gl_position)
+        glEnable(gl_light)
     
     @classmethod
     def disable(cls, foo):
-        GL.glDisable(foo)
+        glDisable(foo)
     
     @classmethod
     def render(cls, renderable):
         transform = renderable.transform
-        x, y, z = transform.position
-        R = transform.rotation
-        rot = [R[0], R[3], R[6], 0,
-               R[1], R[4], R[7], 0,
-               R[2], R[5], R[8], 0,
-               x, y, -z, 1]
-        GL.glPushMatrix()
-        GL.glMultMatrixd(rot)
+        a, b, c = transform.position
+        w, x, y, z = transform.rotation
+        x2 = x * x
+        y2 = y * y
+        z2 = z * z
+        xy = x * y
+        xz = x * z
+        yz = y * z
+        wx = w * x
+        wy = w * y
+        wz = w * z
+        matrix = [1-2*(y2+z2), 2*(xy-wz), 2*(xz+wy), 0,
+                  2*(xy+wz), 1-2*(x2+z2), 2*(yz-wx), 0,
+                  2*(xz-wy), 2*(yz+wx), 1-2*(x2+y2), 0,
+                  a, b, -c, 1]
+        glPushMatrix()
+        glMultMatrixf(matrix)
         if transform.scale != (1, 1, 1):
-            GL.glScalef(*transform.scale)
+            glScalef(*transform.scale)
         if renderable.color is not None:
-            GL.glColor(*renderable.color)
-        GL.glCallList(renderable.gl_list)
-        GL.glPopMatrix()
+            glColor(*renderable.color)
+        glCallList(renderable.gl_list)
+        glPopMatrix()
+    
+    @classmethod
+    def activate_fog(cls, color, density=.35, start=10., end=125.):
+        glEnable(GL_FOG)
+        glFogfv(GL_FOG_COLOR, color)
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        glFogf(GL_FOG_DENSITY, density)
+        glFogf(GL_FOG_START, start)
+        glFogf(GL_FOG_END, end)
+    
+    @classmethod
+    def desactivate_fog(cls):
+        glDisable(GL_FOG)
+    
+    @classmethod
+    def load_texture(cls, filename):
+        texture_surface = pygame.image.load(filename)
+        width, height = texture_surface.get_rect().size
+        texture_data = pygame.image.tostring(texture_surface, 'RGB', True)
+        texture_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, texture_data)
+        return texture_id
+    
+    @classmethod
+    def delete_texture(cls, texture_id):
+        glDeleteTextures(texture_id)
+    
+    @classmethod
+    def do_2d_stuff(cls):
+        glMatrixMode(GL_MODELVIEW)
+        glDisable(GL_DEPTH_TEST)
+        pygame.draw.aaline(cls._screen, (0,0,0), (0,0), (100,100))
+        glEnable(GL_DEPTH_TEST)
+

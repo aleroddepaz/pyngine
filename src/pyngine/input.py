@@ -1,4 +1,6 @@
 import pygame
+import json
+import socket
 
 
 class Input(object):
@@ -104,3 +106,33 @@ class Input(object):
             return 1
         else:
             return 0
+    
+    @classmethod
+    def to_json(cls):
+        jsondict = { 'token': cls.token }
+        jsondict['keys'] = cls.keys
+        jsondict['mouse_position'] = cls.get_mouse_position()
+        json.dumps(jsondict)
+    
+    address = None
+    socket = None
+    token = None
+    
+    @classmethod
+    def connect_server(cls, host, port, player):
+        cls.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        cls.address = (host, port)
+        cls.socket.connect(cls.address)
+        cls.socket.sendall(player)
+        cls.token = cls.socket.recv(1024)
+        print("Token: " + cls.token)
+    
+    @classmethod
+    def update_client(cls):
+        cls.socket.sendall(cls.to_json())
+        return cls.socket.recv
+
+    @classmethod
+    def close_connection(cls):
+        cls.socket.close()
+
