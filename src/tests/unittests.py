@@ -41,9 +41,14 @@ class TestTransform(unittest.TestCase):
     def setUp(self):
         self.transform = Transform(position=(0,0,0))
         
-    def testMove(self):
+    def testTranslate(self):
         self.transform.translate(movement=(1,1,1))
         assert self.transform.position == (1,1,1)
+
+    def testRotate(self):
+        self.transform.rotate([0,1,0], math.pi)
+        quaternion = tuple(map(math.floor, self.transform.rotation))
+        assert quaternion == (0,0,1,0)
 
 
 class TestCollider(unittest.TestCase):
@@ -93,14 +98,16 @@ class TestCollider(unittest.TestCase):
         other = GameObject(Transform((0, 5, 0)),
                            BoxCollider(), Rigidbody(1))
         for _ in xrange(60): PhysicsEngine.step(1./60)
-        assert self.gameobject.transform.position[1] < other.transform.position[1]
+        ygameobject = self.gameobject.transform.position.y
+        yother = other.transform.position.y
+        assert ygameobject < yother
+
     def testUpdate5(self):
         self.gameobject.addcomponent(self.collider)
         position_pre = self.gameobject.transform.position
-        other = GameObject(Transform((0, 5, 0)),       #@UnusedVariable
+        other = GameObject(Transform((0, 5, 0)), #@UnusedVariable
                            BoxCollider(), Rigidbody(1)) 
-        for _ in xrange(60):
-            PhysicsEngine.step(1./60)
+        for _ in xrange(60): PhysicsEngine.step(1./60)
         assert self.gameobject.transform.position == position_pre
 
 
@@ -129,14 +136,6 @@ class TestGameObject(unittest.TestCase):
         component = ExampleComponent()
         self.gameobject.addcomponent(component)
         assert self.transform is component.transform
-    
-    def testToJSON1(self):
-        json = self.gameobject.tojson()
-        transform = self.transform
-        print json
-        assert json == "{position: %s, rotation: %s, scale: %s, children: []" % (transform.position,
-                                                                                 transform.rotation,
-                                                                                 transform.scale)
 
 
 if __name__ == "__main__":

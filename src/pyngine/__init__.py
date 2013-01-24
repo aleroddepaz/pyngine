@@ -1,6 +1,5 @@
 # Python Standard Library modules
 import random
-import json
 import math
 import os
 
@@ -10,7 +9,7 @@ import OpenGL.GL as GL
 import OpenGL.GLUT as GLUT
 
 # PyNgine modules
-from geom import Quaternion
+from geom import Vector3D, Quaternion
 from openglrenderer import OpenGLRenderer
 from physics import PhysicsEngine
 from input import Input
@@ -55,6 +54,12 @@ class Component(object):
     def update(self):
         """
         Method called in each iteration of the gameloop
+        """
+        pass
+    
+    def lateupdate(self):
+        """
+        Method called after all the updates of the gameobject's components
         """
         pass
     
@@ -361,9 +366,15 @@ class Rigidbody(Component):
         self._body.setQuaternion(self.transform.rotation)
         self.transform._setbody(self._body)
         if self.collider is not None:
-            self.collider._setbody(self._body)
-            
+            self._setcollider()
+    
+    def _setcollider(self):
+        self.collider._setbody(self._body)
+        
     def addforce(self, force):
+        """
+        Adds a force to the rigidbody
+        """
         self._body.addForce(force)
         
     def isenabled(self):
@@ -384,6 +395,12 @@ class Rigidbody(Component):
     @velocity.setter
     def velocity(self, value):
         self._body.setLinearVel(value)
+    
+    def enable(self):
+        self._body.enable()
+    
+    def disable(self):
+        self._body.disable()
 
 
 class Collider(Component):
@@ -399,12 +416,20 @@ class Collider(Component):
         self._geom.setPosition(self.transform.position)
         self._geom.setQuaternion(self.transform.rotation)
         self.transform._setgeom(self._geom)
+        if self.rigidbody:
+            self.rigidbody._setcollider()
         
     def _setbody(self, body):
         self._geom.setBody(body)
         
     def _clearbody(self):
         self._geom.setBody(None)
+    
+    def disable(self):
+        self._geom.disable()
+    
+    def enable(self):
+        self._geom.enable()
 
 
 class BoxCollider(Collider):
@@ -432,11 +457,12 @@ class SphereCollider(Collider):
 class Transform(Component):
 
     def __init__(self, position=(0, 0, 0),
-                 rotation=[0,0,1,0], scale=(1, 1, 1)):
+                 rotation=(1,0,0,0), scale=(1, 1, 1)):
         Component.__init__(self)
         self._position = position
         self._rotation = rotation
         self._scale = scale
+        self._children = []
         self._geom = None
         self._body = None
     
@@ -466,27 +492,33 @@ class Transform(Component):
         
     @property
     def position(self):
+        result = self._position
         if self._body is not None:
-            return self._body.getPosition()
-        if self._geom is not None:
-            return self._geom.getPosition()
-        return self._position
+            result = self._body.getPosition()
+        elif self._geom is not None:
+            result = self._geom.getPosition()
+        return Vector3D(*result)
     
     @position.setter
     def position(self, value):
+        startposition = self.position
         if self._body is not None:
             self._body.setPosition(value)
-        if self._geom is not None:
+        elif self._geom is not None:
             self._geom.setPosition(value)
         self._position = value
+        offset = self.position - startposition
+        for child in self._children:
+            child.translate(offset)
     
     @property
     def rotation(self):
+        result = self._rotation
         if self._body is not None:
-            return self._body.getQuaternion()
-        if self._geom is not None:
-            return self._geom.getQuaternion()
-        return self._rotation
+            result = self._body.getQuaternion()
+        elif self._geom is not None:
+            result = self._geom.getQuaternion()
+        return Quaternion(*result)
     
     @rotation.setter
     def rotation(self, value):
@@ -523,15 +555,25 @@ class Transform(Component):
         """
         Moves the transform a certain offset
         """
-        self.position = tuple(map(sum, zip(self.position, movement)))
+        self.position = self.position + movement
+        for child in self._children:
+            child.translate(movement)
 
     def rotate(self, axis, angle):
         """
         Rotates the transform a certain offset
         """
-        q1 = Quaternion(*self.rotation)
+        q1 = self.rotation
         q2 = Quaternion.from_axis(axis, angle)
         self.rotation = q1 * q2
+        for child in self._children:
+            child.rotate(axis, angle)
+    
+    def addchild(self, child):
+        """
+        Adds a Transform to its children
+        """
+        self._children.append(child)
 
 
 class Camera(Component):    
@@ -586,12 +628,11 @@ class Light(Component):
 
 class GameObject(object):
     
+    _gameobjects = []
     _camera = None
     _lights = []
     
     def __init__(self, transform=Transform(), *components):
-        self.parent = None
-        self.children = []
         self.name = ''
         self.tag = ''
         self.transform = None
@@ -601,6 +642,7 @@ class GameObject(object):
         self.components = []
         self.addcomponent(transform)
         for c in components: self.addcomponent(c)
+        GameObject._gameobjects.append(self)
         
     def getcomponentbyclass(self, cls):
         """
@@ -669,8 +711,13 @@ class GameObject(object):
         """
         for component in self.components:
             component.update()
-        for gameobject in self.children:
-            gameobject.update()
+    
+    def lateupdate(self):
+        """
+        Called after all updates
+        """
+        for component in self.components:
+            component.lateupdate()
 
     def render(self):
         """
@@ -678,52 +725,26 @@ class GameObject(object):
         """
         for component in self.renderables:
             component.render()
-        for gameobject in self.children:
-            gameobject.render()
 
     def oncollision(self, other):
         for component in self.components:
             component.oncollision(other)
 
     def destroy(self):
-        self.parent.removegameobject(self)
-
-    def addgameobjects(self, *gameobjects):
-        for gameobject in gameobjects:
-            self._addgameobject(gameobject)
-
-    def addgameobject(self, gameobject):
         """
-        Adds a gameobject as a child
+        Removes a the gameobject from the scene
         """
-        self._addgameobject(gameobject)
+        try:
+            GameObject._gameobjects.remove(self)
+            if self.rigidbody is not None:
+                self.rigidbody.disable()
+                self.rigidbody = None
+            if self.collider is not None:
+                self.collider.disable()
+                self.collider = None
+        except:
+            print("WARNING: This object is already removed")
 
-    def _addgameobject(self, gameobject):
-        self.children.append(gameobject)
-        gameobject.parent = self
-
-    def removegameobject(self, gameobject):
-        """
-        Removes a gameobject from the children
-        """
-        self.children.remove(gameobject)
-        gameobject.parent = None
-    
-    def tojson(self):
-        transform = self.transform
-        result = {'position': transform.position,
-                  'rotation': transform.rotation,
-                  'scale': transform.scale}
-        result['children'] = [x.tojson() for x in self.children]
-        return json.dumps(result)
-    
-    def fromjson(self, data):
-        transform = self.transform
-        transform.position = data['position']
-        transform.rotation = data['rotation']
-        transform.scale = data['scale']
-        for children_data in data['children']:
-            pass #self.
 
 class CubePrimitive(GameObject):
     """
@@ -785,7 +806,7 @@ class MetaColor(type):
 
 class Color(object):
     __metaclass__ = MetaColor
-    def __init__(self, r=0, g=0, b=0, a=1):
+    def __init__(self, r, g, b, a):
         self.__color = (r, g, b, a)
     def __getitem__(self, index):
         return self.__color[index]
@@ -798,7 +819,7 @@ class Color(object):
 # Game
 # ==============================
 
-class Scene(GameObject):
+class Scene(object):
     """
     Root gameobject of a game
     """
@@ -806,14 +827,19 @@ class Scene(GameObject):
         """
         Initializes the physics for the current scene
         """
-        GameObject.__init__(self, Transform())
         PhysicsEngine.start(gravity, erp, cfm)
 
 
 class Game(object):
+    
+    delta = 0.
+    scale = 1.
+    
     def __init__(self, screen_size=(800, 600), title="Pyngine game",
                  fullscreen=False, path_to_icon=None):
         """
+        Initializes the game
+        
         Parameters
         ----------
         screen_size : tuple
@@ -839,21 +865,18 @@ class Game(object):
         fps : int
             Frames per second rate
         """
-        try:
-            self._mainloop(fps)
-        except NameError as e:
-            print e
-        finally:
-            OpenGLRenderer.quit()
+        try: self._mainloop(fps)
+        finally: OpenGLRenderer.quit()
             
     def _mainloop(self, fps):
         step = 1. / fps
         clock = pygame.time.Clock()
         while not Input.quitflag:
             Input.update()
-            self.scene.update()
+            map(GameObject.update, GameObject._gameobjects)
+            #self.scene.lateupdate()
             self._renderloop()
-            PhysicsEngine.step(step)
+            PhysicsEngine.step(step * Game.scale)
             delta = clock.tick(fps)
             Game.delta = delta / 1000.
             
@@ -861,7 +884,7 @@ class Game(object):
         OpenGLRenderer.clearscreen()
         if GameObject._camera: GameObject._camera.push()
         for light in GameObject._lights: light.enable()
-        self.scene.render()
+        map(GameObject.render, GameObject._gameobjects)
         if GameObject._camera: GameObject._camera.pop()
         OpenGLRenderer.flip()
 

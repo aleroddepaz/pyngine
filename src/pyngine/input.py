@@ -1,6 +1,4 @@
 import pygame
-import json
-import socket
 
 
 class Input(object):
@@ -46,14 +44,14 @@ class Input(object):
             return False
         
     @classmethod
-    def get_mouse_position(cls):
+    def getmouseposition(cls):
         """
         Returns the current position of the mouse
         """
         return pygame.mouse.get_pos()
     
     @classmethod
-    def get_mouse_button(cls, index):
+    def getmousebutton(cls, index):
         """
         Returns whether a button of the mouse is pressed or not
         
@@ -65,7 +63,7 @@ class Input(object):
         return pygame.mouse.get_pressed()[index]
     
     @classmethod
-    def get_mouse_visibility(cls):
+    def getmousevisibility(cls):
         """
         Returns a boolean indicating whether the mouse is visible or not
         """
@@ -84,55 +82,25 @@ class Input(object):
         pygame.mouse.set_visible(boolean)
     
     @classmethod
-    def get_horizontal_axis(cls):
+    def gethorizontalaxis(cls): #@NoSelf
         """
         Returns the input direction of the horizontal axis
         """
-        if any(Input.getkey(x) for x in cls._left_buttons):
-            return -1
-        elif any(Input.getkey(x) for x in cls._right_buttons):
-            return 1
-        else:
-            return 0
+        right = any(Input.getkey(x) for x in cls._right_buttons)
+        left = any(Input.getkey(x) for x in cls._left_buttons)
+        return cls._getaxisvalue(right, left)
     
     @classmethod
-    def get_vertical_axis(cls):
+    def getverticalaxis(cls): #@NoSelf
         """
         Returns the input direction of the vertical axis
         """
-        if any(Input.getkey(x) for x in cls._down_buttons):
-            return -1
-        elif any(Input.getkey(x) for x in cls._up_buttons):
-            return 1
-        else:
-            return 0
-    
-    @classmethod
-    def to_json(cls):
-        jsondict = { 'token': cls.token }
-        jsondict['keys'] = cls.keys
-        jsondict['mouse_position'] = cls.get_mouse_position()
-        json.dumps(jsondict)
-    
-    address = None
-    socket = None
-    token = None
-    
-    @classmethod
-    def connect_server(cls, host, port, player):
-        cls.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        cls.address = (host, port)
-        cls.socket.connect(cls.address)
-        cls.socket.sendall(player)
-        cls.token = cls.socket.recv(1024)
-        print("Token: " + cls.token)
-    
-    @classmethod
-    def update_client(cls):
-        cls.socket.sendall(cls.to_json())
-        return cls.socket.recv
+        up = any(Input.getkey(x) for x in cls._up_buttons)
+        down = any(Input.getkey(x) for x in cls._down_buttons)
+        return cls._getaxisvalue(up, down)
 
     @classmethod
-    def close_connection(cls):
-        cls.socket.close()
-
+    def _getaxisvalue(cls, pos, neg):
+        if pos and not neg: return 1
+        if neg and not pos: return -1
+        else: return 0

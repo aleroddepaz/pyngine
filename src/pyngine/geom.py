@@ -1,33 +1,69 @@
 import math
 
-class Quaternion(object):
-    def __init__(self, w=1, x=0, y=0, z=0):
-        self.w = w
-        self.x = x
-        self.y = y
-        self.z = z
+
+class MetaVector3D(type):
+    @property
+    def right(cls): return cls(1, 0, 0)  # @NoSelf
+    @property
+    def up(cls): return cls(0, 1, 0)  # @NoSelf
+    @property
+    def forward(cls): return cls(0, 0, 1)  # @NoSelf
+
+
+class Vector3D(tuple):
+    
+    __metaclass__ = MetaVector3D
+
+    def __new__(cls, x, y, z):
+        return tuple.__new__(cls, (x,y,z))
+
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
+    @property
+    def z(self):
+        return self[2]
+    
+    def __add__(self, other):
+        return Vector3D(*[a+b for a,b in zip(self, other)])
+    
+    
+    def __sub__(self, other):
+        return Vector3D(*[a-b for a,b in zip(self, other)])
+    
+    def __mul__(self, factor):
+        return Vector3D(*[n * factor for n in self])
+
+
+class Quaternion(tuple):
+    
+    def __new__(cls, w, x, y, z):
+        return tuple.__new__(cls, (w,x,y,z))
     
     @property
     def conjugate(self):
         return Quaternion(self.w, -self.x, -self.y, -self.z)
     
-    def __iter__(self):
-        yield self.w
-        yield self.x
-        yield self.y
-        yield self.z
+    @property
+    def w(self):
+        return self[0]    
     
-    def __getitem__(self, key):
-        if key == 0: return self.w
-        elif key == 1: return self.x
-        elif key == 2: return self.y
-        elif key == 3: return self.z
+    @property
+    def x(self):
+        return self[1]
     
-    def __setitem__(self, key, value):
-        if key == 0: self.w = value
-        elif key == 1: self.x = value
-        elif key == 2: self.y = value
-        elif key == 3: self.z = value
+    @property
+    def y(self):
+        return self[2]
+    
+    @property
+    def z(self):
+        return self[3]
 
     def __repr__(self):
         return "Quaternion(%s, %s, %s, %s)" % (self.w, self.x, self.y, self.z)
@@ -46,13 +82,13 @@ class Quaternion(object):
         vquat = Quaternion(0.0, vn[0], vn[1], vn[2])
         resquat = vquat * self.conjugate
         resquat = self * resquat
-        return [resquat.x, resquat.y, resquat.z]
+        return Vector3D(resquat.x, resquat.y, resquat.z)
 
     @staticmethod
     def from_axis(axis, angle):
-        angle *= 0.5
         s = sum(axis, 0.0)
         axis = [n/s for n in axis]
+        angle *= 0.5
         sin = math.sin(angle)
         cos = math.cos(angle)
         return Quaternion(cos, axis[0] * sin, axis[1] * sin, axis[2] * sin)

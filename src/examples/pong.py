@@ -1,15 +1,4 @@
 from pyngine import * #@UnusedWildImport
-from pygame import K_UP, K_DOWN, K_w, K_s
-
-
-class Qwe(Component):
-    def start(self):
-        self.angle = 0
-    def update(self):
-        if Input.getkey(pygame.K_q):
-            self.transform.rotation = Quaternion.from_axis([0,1,0], self.angle)
-            self.angle += 0.01
-            print(self.transform.right)
 
 
 class KeyboardMovement(Component):
@@ -27,11 +16,11 @@ class KeyboardMovement(Component):
 
 class ArrowMovement(KeyboardMovement):
     def __init__(self):
-        KeyboardMovement.__init__(self, K_UP, K_DOWN)
+        KeyboardMovement.__init__(self, pygame.K_UP, pygame.K_DOWN)
 
 class WSMovement(KeyboardMovement):
     def __init__(self):
-        KeyboardMovement.__init__(self, K_w, K_s)
+        KeyboardMovement.__init__(self, pygame.K_w, pygame.K_s)
 
 class BallMovement(Component):
     def start(self):
@@ -55,7 +44,7 @@ class BallMovement(Component):
 class Paddle(GameObject):
     def __init__(self, pos, movement):
         GameObject.__init__(self, Transform(position=pos, scale=(1, 1, 5)),
-                            BoxCollider(), Cube(Color.blue), movement, Qwe())
+                            BoxCollider(), Cube(Color.blue), movement)
         self.tag = 'Player'
 
 class Limit(GameObject):
@@ -72,14 +61,13 @@ class Ball(GameObject):
 class Pong(Game):
     def __init__(self):
         Game.__init__(self)
-        cameraobj = GameObject(Transform(), Camera((0, 0, 40), (-45, 0, 0)))
-        lightobj = GameObject(Transform((0, 7, 0)), Light())
-        paddle1 = Paddle(pos=(-8, 0, 0), movement=WSMovement())
-        paddle2 = Paddle(pos=(8, 0, 0), movement=ArrowMovement())
-        limit1 = Limit(pos=(0, 0, 10))
-        limit2 = Limit(pos=(0, 0, -10))
-        ball = Ball(pos=(0, 0, -5))
-        self.scene.addgameobjects(cameraobj, lightobj, paddle1, paddle2, ball, limit1, limit2)
+        GameObject(Transform(), Camera((0, 0, 40), (-45, 0, 0)))
+        GameObject(Transform((0, 7, 0)), Light())
+        Paddle(pos=(-8, 0, 0), movement=WSMovement())
+        Paddle(pos=(8, 0, 0), movement=ArrowMovement())
+        Limit(pos=(0, 0, 10))
+        Limit(pos=(0, 0, -10))
+        Ball(pos=(0, 0, -5))
 
 
 if __name__ == "__main__":
