@@ -129,6 +129,14 @@ class TestGameObject(unittest.TestCase):
         component = ExampleComponent()
         self.gameobject.addcomponent(component)
         assert self.transform is component.transform
+    
+    def testToJSON1(self):
+        json = self.gameobject.tojson()
+        transform = self.transform
+        print json
+        assert json == "{position: %s, rotation: %s, scale: %s, children: []" % (transform.position,
+                                                                                 transform.rotation,
+                                                                                 transform.scale)
 
 
 if __name__ == "__main__":

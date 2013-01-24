@@ -708,7 +708,22 @@ class GameObject(object):
         """
         self.children.remove(gameobject)
         gameobject.parent = None
-
+    
+    def tojson(self):
+        transform = self.transform
+        result = {'position': transform.position,
+                  'rotation': transform.rotation,
+                  'scale': transform.scale}
+        result['children'] = [x.tojson() for x in self.children]
+        return json.dumps(result)
+    
+    def fromjson(self, data):
+        transform = self.transform
+        transform.position = data['position']
+        transform.rotation = data['rotation']
+        transform.scale = data['scale']
+        for children_data in data['children']:
+            pass #self.
 
 class CubePrimitive(GameObject):
     """
