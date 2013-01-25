@@ -4,8 +4,22 @@ from distutils.core import setup
 
 version = '0.0.4'
 
-long_description = '''Pyngine is a minimalist component-based game engine
-for developing 3D Indie games easily for Linux, Mac OS X and Windows'''
+long_description = '''
+Pyngine is a minimalist component-based game engine for
+developing 3D indie games easily for Linux, Mac OS X and Windows.
+
+Features:
+
+* Geom primitives such as Cubes and Spheres
+
+* Colliders and rigidbodies
+
+* Import OBJ files
+
+* ODE Physics engine
+
+* Wrappers and components to work with keyboard input and audio
+'''
 
 setup(
     name = 'PyNgine',

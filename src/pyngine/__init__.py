@@ -556,8 +556,6 @@ class Transform(Component):
         Moves the transform a certain offset
         """
         self.position = self.position + movement
-        for child in self._children:
-            child.translate(movement)
 
     def rotate(self, axis, angle):
         """
@@ -574,6 +572,9 @@ class Transform(Component):
         Adds a Transform to its children
         """
         self._children.append(child)
+    
+    def __iter__(self):
+        return self._children.__iter__()
 
 
 class Camera(Component):    

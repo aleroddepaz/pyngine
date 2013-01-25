@@ -2,6 +2,17 @@ import unittest
 from pyngine import * # @UnusedWildImport
 
 
+# ==============================
+# Test utils
+# ==============================
+
+class PhysicsSimulator(object):
+    @classmethod
+    def step(cls, time):
+        for _ in xrange(time):
+            PhysicsEngine.step(1./time)
+
+
 class ExampleComponent(Component):
     
     def __init__(self):
@@ -14,6 +25,39 @@ class ExampleComponent(Component):
         
     def update(self):
         self.updates += 1
+
+
+
+# ==============================
+# Test Cases
+# ==============================
+
+class TestVector3D(unittest.TestCase):
+    
+    def setUp(self):
+        self.vector = Vector3D(1, 1, 1)
+    
+    def testAdd(self):
+        other = Vector3D(1, 2, 3)
+        assert self.vector + other == Vector3D(2, 3, 4)
+    
+    def testSub(self):
+        other = Vector3D(.5, .5, .5)
+        assert self.vector - other == Vector3D(.5, .5, .5)
+        
+    def testMul(self):
+        factor = 5
+        assert self.vector * factor == Vector3D(5, 5, 5)
+
+
+class TestQuaternion(unittest.TestCase):
+    
+    def setUp(self):
+        self.quaternion = Quaternion(1, 0, 1, 0)
+    
+    def testConjugate(self):
+        conjugate = self.quaternion.conjugate
+        assert conjugate == (1, 0, -1, 0)
 
 
 class TestComponent(unittest.TestCase):
@@ -39,16 +83,25 @@ class TestComponent(unittest.TestCase):
 class TestTransform(unittest.TestCase):
     
     def setUp(self):
-        self.transform = Transform(position=(0,0,0))
+        self.transform = Transform(position=(0, 0, 0))
+        self.child = Transform(position=(0, 1, 0))
         
-    def testTranslate(self):
-        self.transform.translate(movement=(1,1,1))
-        assert self.transform.position == (1,1,1)
+    def testTranslate1(self):
+        self.transform.translate(movement=(1, 1, 1))
+        assert self.transform.position == (1, 1, 1)
+    
+    def testTranslate2(self):
+        self.transform.addchild(self.child)
+        self.transform.translate(movement=(1, 1, 1))
+        assert self.child.position == (1, 2, 1)
 
     def testRotate(self):
-        self.transform.rotate([0,1,0], math.pi)
-        quaternion = tuple(map(math.floor, self.transform.rotation))
-        assert quaternion == (0,0,1,0)
+        self.transform.rotate(Vector3D.up, math.pi)
+        assert self.transform.rotation.round == (0, 0, 1, 0)
+    
+    def testAddChild(self):
+        self.transform.addchild(self.child)
+        assert self.child in self.transform
 
 
 class TestCollider(unittest.TestCase):
@@ -75,14 +128,14 @@ class TestCollider(unittest.TestCase):
     def testUpdate1(self):
         self.gameobject.addcomponent(self.collider)
         position_pre = self.gameobject.transform.position
-        PhysicsEngine.step(1)
+        PhysicsSimulator.step(60)
         assert self.gameobject.transform.position == position_pre
         
     def testUpdate2(self):
         self.gameobject.addcomponent(self.collider)
         self.gameobject.addcomponent(Rigidbody(1))
         position_pre = self.gameobject.transform.position
-        PhysicsEngine.step(1)
+        PhysicsSimulator.step(60)
         assert self.gameobject.transform.position != position_pre
         
     def testUpdate3(self):
@@ -90,14 +143,14 @@ class TestCollider(unittest.TestCase):
         self.gameobject.addcomponent(Rigidbody(1))
         other = GameObject(Transform((0, -2, 0)), BoxCollider())
         position_pre = other.transform.position
-        for _ in xrange(60): PhysicsEngine.step(1./60)
+        PhysicsSimulator.step(60)
         assert other.transform.position == position_pre
         
     def testUpdate4(self):
         self.gameobject.addcomponent(self.collider)
         other = GameObject(Transform((0, 5, 0)),
                            BoxCollider(), Rigidbody(1))
-        for _ in xrange(60): PhysicsEngine.step(1./60)
+        PhysicsSimulator.step(60)
         ygameobject = self.gameobject.transform.position.y
         yother = other.transform.position.y
         assert ygameobject < yother
@@ -107,7 +160,7 @@ class TestCollider(unittest.TestCase):
         position_pre = self.gameobject.transform.position
         other = GameObject(Transform((0, 5, 0)), #@UnusedVariable
                            BoxCollider(), Rigidbody(1)) 
-        for _ in xrange(60): PhysicsEngine.step(1./60)
+        PhysicsSimulator.step(60)
         assert self.gameobject.transform.position == position_pre
 
 

@@ -50,6 +50,10 @@ class Quaternion(tuple):
         return Quaternion(self.w, -self.x, -self.y, -self.z)
     
     @property
+    def round(self):
+        return Quaternion(*map(round, self))
+    
+    @property
     def w(self):
         return self[0]    
     
