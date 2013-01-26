@@ -21,71 +21,60 @@ from input import Input
 # ==============================
 
 class Component(object):
+    """Base class for all components"""
+
     def __init__(self):
         self.gameobject = None
 
     @property
     def transform(self):
-        """
-        Reference to the gameobject's transform
-        """
+        """Reference to the attached gameobject's transform"""
         return self.gameobject.transform
     
     @property
     def rigidbody(self):
-        """
-        Reference to the gameobject's rigidbody
-        """
+        """Reference to the attached gameobject's rigidbody"""
         return self.gameobject.rigidbody
     
     @property
     def collider(self):
-        """
-        Reference to the gameobject's collider
-        """
+        """Reference to the attached gameobject's collider"""
         return self.gameobject.collider
     
     def start(self):
-        """
-        Method called when the component is added to the game object
-        """
+        """Called when the component is added to the game object"""
         pass
     
     def update(self):
         """
-        Method called in each iteration of the gameloop
+        Called in each iteration of the gameloop.
+        
+        For example::
+        
+            class MyComponent(Component):
+                def update(self):
+                    # Move 0.1 each step in the y-axis
+                    self.transform.translate((0, .1, 0))
         """
         pass
     
     def lateupdate(self):
-        """
-        Method called after all the updates of the gameobject's components
-        """
+        """Called after all the updates of the attached gameobject's components"""
         pass
     
     def oncollision(self, other):
         """
-        Method called in each iteration of the gameloop when
-        the component's gameobject has collided with another gameobject
-        
-        Parameters
-        ----------
-        other : GameObject
-            The other gameobject which has collided 
-            with the component's gameobject 
+        Called in each iteration of the gameloop when the attached gameobject has 
+        collided with another gameobject. *other* is the gameobject which has collided 
+        with the component's gameobject 
         """
         pass
     
     def handlemessage(self, string, data):
         """
-        Calls dynamically a method of the component
-        
-        Parameters
-        ----------
-        string : str
-            Method name
-        data : list
-            Arguments for the called method
+        Calls dynamically a method of the component. *string* is the name of the method
+        and *data* is the argument list for that method. It raises a ``TypeError`` if
+        the component does not have the specified attribute
         """
         if string in dir(Component):
             raise TypeError, "Cannot call Component class methods"
@@ -94,9 +83,8 @@ class Component(object):
 
 
 class Renderable(Component):
-    """
-    Component used for enabling 3D rendering of a gameobject
-    """
+    """Component used for enabling 3D rendering of a gameobject"""
+
     def __init__(self, color):
         Component.__init__(self)
         self.gl_list = GL.glGenLists(1)
@@ -107,9 +95,8 @@ class Renderable(Component):
 
 
 class Cube(Renderable):
-    """
-    Renderable component for displaying a cube
-    """
+    """Renderable component for displaying a cube"""
+
     def __init__(self, color=(0, 0, 0, 1)):
         Renderable.__init__(self, color)
         GL.glNewList(self.gl_list, GL.GL_COMPILE)
@@ -118,9 +105,8 @@ class Cube(Renderable):
 
 
 class Sphere(Renderable):
-    """
-    Renderable component for displaying a sphere
-    """
+    """Renderable component for displaying a sphere"""
+
     slices = 18
     stacks = 18
     
@@ -132,9 +118,8 @@ class Sphere(Renderable):
 
 
 class Torus(Renderable):
-    """
-    Renderable component for displaying a torus
-    """
+    """Renderable component for displaying a torus"""
+
     slices = 15
     rings = 15
     
@@ -147,17 +132,12 @@ class Torus(Renderable):
 
 
 class Mesh(Renderable):
-    """
-    Renderable component for imported meshes
-    """
+    """Renderable component for imported meshes"""
+
     def __init__(self, filename):
         """
-        Loads a mesh from an OBJ file
-        
-        Parameters
-        ----------
-        filename : str
-            Path to the OBJ file
+        Loads a mesh from an OBJ file. *filename* is the string that indicates the
+        path to the OBJ file
         """
         Renderable.__init__(self, (0,0,0,1))
         filename = os.path.join(Mesh.mesh_folder, filename)
@@ -265,20 +245,19 @@ class Mesh(Renderable):
 
 
 class Audio(Component):
+    """Component used to play an audio file"""
+    
     def __init__(self, filename):
         """
-        Creates an audio component from an audio file
-        
-        Parameters
-        ----------
-        filename : str
-            Path to the audio file
+        Creates an audio component from an audio file. *filename* is the string that
+        indicates the path to the audio file
         """
         Component.__init__(self)
         self.sound = pygame.mixer.Sound(filename)
     
     @property
     def volume(self):
+        """The volume of the audio file"""
         self.sound.get_volume()
     
     @volume.setter
@@ -287,15 +266,14 @@ class Audio(Component):
     
     def play(self, loops=0, maxtime=0, fade_ms=0):
         """
-        Plays the audio sound
+        Plays the audio sound. *loops* indicates the number of times that the 
         """
         self.sound.play(loops, maxtime, fade_ms)
     
     def stop(self):
-        """
-        Stops the audio sound
-        """
+        """Stops the audio sound"""
         self.sound.stop()
+
 
 class Particle(object):
     def __init__(self, position, direction,
@@ -353,7 +331,13 @@ class ParticleEmitter(Renderable):
 
 
 class Rigidbody(Component):
+    """Component that simulates the mechanics of a rigid body"""
+    
     def __init__(self, density):
+        """
+        Initializes the rigidbody representation. *density* is the integer that indicates
+        the density of the body
+        """
         Component.__init__(self)
         self.density = density
         self._body = PhysicsEngine.createbody()
@@ -372,12 +356,11 @@ class Rigidbody(Component):
         self.collider._setbody(self._body)
         
     def addforce(self, force):
-        """
-        Adds a force to the rigidbody
-        """
+        """Adds a force to the rigidbody"""
         self._body.addForce(force)
         
     def isenabled(self):
+        """Returns whether the rigidbody is enabled or not"""
         return self._body.isEnabled() == 1
     
     @property
@@ -404,9 +387,8 @@ class Rigidbody(Component):
 
 
 class Collider(Component):
-    """
-    Component used for collision detection
-    """
+    """Component used for collision detection"""
+
     def __init__(self):
         Component.__init__(self)
         self._geom = None
@@ -433,6 +415,7 @@ class Collider(Component):
 
 
 class BoxCollider(Collider):
+    """Collider with a box shape"""
     
     def __init__(self):
         Collider.__init__(self)
@@ -444,6 +427,7 @@ class BoxCollider(Collider):
 
 
 class SphereCollider(Collider):
+    """Collider with a sphere shape"""
     
     def __init__(self):
         Collider.__init__(self)
@@ -455,9 +439,16 @@ class SphereCollider(Collider):
 
 
 class Transform(Component):
+    """
+    Component that stores the gameobject transform properties:
+    
+    * Position
+    * Rotation
+    * Scale
+    """
 
-    def __init__(self, position=(0, 0, 0),
-                 rotation=(1,0,0,0), scale=(1, 1, 1)):
+    def __init__(self, position=(0, 0, 0), rotation=(1,0,0,0),
+                 scale=(1, 1, 1)):
         Component.__init__(self)
         self._position = position
         self._rotation = rotation

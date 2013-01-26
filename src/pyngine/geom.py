@@ -8,9 +8,12 @@ class MetaVector3D(type):
     def up(cls): return cls(0, 1, 0)  # @NoSelf
     @property
     def forward(cls): return cls(0, 0, 1)  # @NoSelf
+    @property
+    def zero(cls): return cls(0, 0, 0)  # @NoSelf
 
 
 class Vector3D(tuple):
+    """3-dimensional vector"""
     
     __metaclass__ = MetaVector3D
 
@@ -40,7 +43,15 @@ class Vector3D(tuple):
         return Vector3D(*[n * factor for n in self])
 
 
+class MetaQuaternion(type):
+    @property
+    def identity(cls): return cls(1, 0, 0, 0)  # @NoSelf
+
+
 class Quaternion(tuple):
+    """Representation of a rotation"""
+    
+    __metaclass__ = MetaQuaternion
     
     def __new__(cls, w, x, y, z):
         return tuple.__new__(cls, (w,x,y,z))
@@ -90,6 +101,9 @@ class Quaternion(tuple):
 
     @staticmethod
     def from_axis(axis, angle):
+        """
+        Returns a Quaternion from the rotation of a vector by an angle
+        """
         s = sum(axis, 0.0)
         axis = [n/s for n in axis]
         angle *= 0.5
