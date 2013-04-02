@@ -7,6 +7,9 @@ from pyngine import * # @UnusedWildImport
 # ==============================
 
 class PhysicsSimulator(object):
+    """
+    Utility class for simulating physics steps
+    """
     @classmethod
     def step(cls, time):
         for _ in xrange(time):

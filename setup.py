@@ -34,7 +34,7 @@ setup(
     packages = ['pyngine'],
     package_dir = {'pyngine': 'src/pyngine'},
     package_data = {'pyngine': ['data/*']},
-    requires = ['Pygame', 'PyOpenGL', 'PyODE'],
+    install_requires = ['Pygame', 'PyOpenGL', 'PyODE'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',

@@ -126,7 +126,7 @@ class Torus(Renderable):
     def __init__(self, inner=1, outer=1, color=(0, 0, 0, 1)):
         Renderable.__init__(self, color)
         GL.glNewList(self.gl_list, GL.GL_COMPILE)
-        f = inner+outer*2.
+        f = inner + outer * 2.
         GLUT.glutSolidTorus(inner/(f*2.), outer/f, Torus.slices, Torus.rings)
         GL.glEndList()
 
@@ -827,36 +827,25 @@ class Game(object):
     delta = 0.
     scale = 1.
     
-    def __init__(self, screen_size=(800, 600), title="Pyngine game",
-                 fullscreen=False, path_to_icon=None):
+    def __init__(self, screen_size=(800, 600), fullscreen=False):
         """
         Initializes the game
-        
-        Parameters
-        ----------
-        screen_size : tuple
-        title : str
-        fullscreen : bool
-        path_to_icon : str
         """
         self.screen_size = screen_size
-        self.title = title
+        self.fullscreen = fullscreen
+        self.title = "Pyngine game"
+        self.icon = None
         self.camera = None
         self.lights = []
         self.scene = Scene()
-        OpenGLRenderer.init(screen_size, fullscreen)
-        OpenGLRenderer.set_window_title(title)        
-        OpenGLRenderer.set_window_icon(path_to_icon)
         
     def mainloop(self, fps=60):
         """
         Starts the mainloop of the game
-        
-        Parameters
-        ----------
-        fps : int
-            Frames per second rate
         """
+        OpenGLRenderer.init(self.screen_size, self.fullscreen)
+        OpenGLRenderer.set_window_title(self.title)        
+        OpenGLRenderer.set_window_icon(self.icon)
         try: self._mainloop(fps)
         finally: OpenGLRenderer.quit()
             
