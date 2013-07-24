@@ -57,8 +57,7 @@ class OpenGLRenderer(object):
     
     @classmethod
     def enable(cls):
-        """
-        Enables the GL capabilities needed
+        """Enables the GL capabilities needed
         """
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_TEXTURE_2D)
@@ -70,8 +69,7 @@ class OpenGLRenderer(object):
     
     @classmethod
     def define_settings(cls):
-        """
-        Specifies the settings used for the GL capabilities
+        """Specifies the settings used for the GL capabilities
         """
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
@@ -98,8 +96,7 @@ class OpenGLRenderer(object):
         
     @classmethod
     def set_window_icon(cls, path):
-        """
-        Sets the window icon
+        """Sets the window icon
         
         Parameters
         ----------

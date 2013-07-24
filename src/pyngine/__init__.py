@@ -1,4 +1,3 @@
-# Python Standard Library modules
 import random
 import math
 import os
@@ -8,8 +7,7 @@ import pygame
 import OpenGL.GL as GL
 import OpenGL.GLUT as GLUT
 
-# PyNgine modules
-from geom import Vector3D, Quaternion
+import geom
 from openglrenderer import OpenGLRenderer
 from physics import PhysicsEngine
 from input import Input
@@ -476,8 +474,7 @@ class Transform(Component):
         self._body = body
         
     def _clearbody(self):
-        """
-        Set the reference to the body of the gameobject's rigidbody to None
+        """Set the reference to the body of the gameobject's rigidbody to None
         """
         self._body = None
         
@@ -488,7 +485,7 @@ class Transform(Component):
             result = self._body.getPosition()
         elif self._geom is not None:
             result = self._geom.getPosition()
-        return Vector3D(*result)
+        return geom.Vector3D(*result)
     
     @position.setter
     def position(self, value):
@@ -509,7 +506,7 @@ class Transform(Component):
             result = self._body.getQuaternion()
         elif self._geom is not None:
             result = self._geom.getQuaternion()
-        return Quaternion(*result)
+        return geom.Quaternion(*result)
     
     @rotation.setter
     def rotation(self, value):
@@ -529,17 +526,17 @@ class Transform(Component):
 
     @property
     def right(self):
-        q = Quaternion(*self.rotation)
+        q = geom.Quaternion(*self.rotation)
         return q.rotate_vector([1, 0, 0])
 
     @property
     def up(self):
-        q = Quaternion(*self.rotation)
+        q = geom.Quaternion(*self.rotation)
         return q.rotate_vector([0, 1, 0])
 
     @property
     def forward(self):
-        q = Quaternion(*self.rotation)
+        q = geom.Quaternion(*self.rotation)
         return q.rotate_vector([0, 0, 1])
 
     def translate(self, movement):
@@ -553,7 +550,7 @@ class Transform(Component):
         Rotates the transform a certain offset
         """
         q1 = self.rotation
-        q2 = Quaternion.from_axis(axis, angle)
+        q2 = geom.Quaternion.from_axis(axis, angle)
         self.rotation = q1 * q2
         for child in self._children:
             child.rotate(axis, angle)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
-version = '0.0.4'
+version = '0.0.5'
 
 long_description = '''
 Pyngine is a minimalist component-based game engine for
